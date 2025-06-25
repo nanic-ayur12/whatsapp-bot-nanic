@@ -69,7 +69,7 @@ const sendKeepAlive = async () => {
 };
 
 // Start keep-alive monitoring (enable if KEEP_ALIVE_URL is set)
-if (process.env.KEEP_ALIVE_URL && process.env.KEEP_ALIVE_URL.includes('onrender.com')) {
+if (process.env.KEEP_ALIVE_URL) {
   keepAliveInterval = setInterval(sendKeepAlive, KEEP_ALIVE_INTERVAL);
   console.log(`Keep-alive monitoring started (checking every ${KEEP_ALIVE_INTERVAL / 60000} minutes)`);
 }
@@ -490,7 +490,7 @@ app.get('/api/activity-status', (req, res) => {
     timeSinceLastActivity: Math.round(timeSinceLastActivity / 1000),
     thresholdSeconds: INACTIVITY_THRESHOLD / 1000,
     isInactive: timeSinceLastActivity > INACTIVITY_THRESHOLD,
-    keepAliveEnabled: !!(process.env.KEEP_ALIVE_URL && process.env.KEEP_ALIVE_URL.includes('onrender.com'))
+    keepAliveEnabled: !!(process.env.KEEP_ALIVE_URL)
   });
 });
 
@@ -639,5 +639,5 @@ process.on('SIGINT', () => {
 app.listen(PORT, () => {
   console.log(`✅ WhatsApp Bot running at http://localhost:${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`⏰ Keep-alive monitoring: ${(process.env.KEEP_ALIVE_URL && process.env.KEEP_ALIVE_URL.includes('onrender.com')) ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`⏰ Keep-alive monitoring: ${(process.env.KEEP_ALIVE_URL) ? 'ENABLED' : 'DISABLED'}`);
 });
