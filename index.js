@@ -926,7 +926,14 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
             country: "India",
             phone: `+91${session.mobile}`,
             name: session.name
-          }
+          },
+          shipping_lines: [
+            {
+              title: "Courier",
+              price: session.shipping,
+              code: "Courier"
+            }
+          ]
         }
       };
 
