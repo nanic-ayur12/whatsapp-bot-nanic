@@ -1,7 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
-const crypto = require("crypto");
 
 require("dotenv").config();
 
@@ -17,11 +16,6 @@ const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL;
 const INACTIVITY_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
 const KEEP_ALIVE_INTERVAL = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-// Flow IDs (you'll need to create these in your WhatsApp Business Manager)
-const FLOW_IDS = {
-  CHECKOUT: process.env.CHECKOUT_FLOW_ID, // Create this flow for checkout process
-};
 
 const sessions = {};
 
@@ -125,137 +119,28 @@ app.get("/webhook", (req, res) => {
   res.sendStatus(403);
 });
 
-// Send Flow Message
-const sendFlowMessage = async (phone, flowId, flowData = {}) => {
-  updateActivity();
-  
-  const flowMessage = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to: phone,
-    type: 'interactive',
-    interactive: {
-      type: 'flow',
-      header: {
-        type: 'text',
-        text: '🛍️ Complete Your Order'
-      },
-      body: {
-        text: 'Please fill out the form below to complete your order:'
-      },
-      footer: {
-        text: 'Nanic Ayurveda'
-      },
-      action: {
-        name: 'flow',
-        parameters: {
-          flow_message_version: '3',
-          flow_token: crypto.randomBytes(16).toString('hex'),
-          flow_id: flowId,
-          flow_cta: 'Complete Order',
-          flow_action: 'navigate',
-          flow_action_payload: {
-            screen: 'CHECKOUT',
-            data: flowData
-          }
-        }
-      }
-    }
-  };
-
-  // Add debug logging to check what data is being sent
-  console.log('Flow data being sent:', JSON.stringify(flowData, null, 2));
-  console.log('Complete flow message:', JSON.stringify(flowMessage, null, 2));
-
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-      flowMessage,
-      {
-        headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json',
-        }
-      }
-    );
-  } catch (error) {
-    console.error('Flow message error:', error.response?.data || error.message);
-  }
-};
-
-// Send interactive button message
-const sendInteractiveMessage = async (phone, headerText, bodyText, buttons) => {
-  updateActivity();
-  
-  const message = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to: phone,
-    type: 'interactive',
-    interactive: {
-      type: 'button',
-      header: {
-        type: 'text',
-        text: headerText
-      },
-      body: {
-        text: bodyText
-      },
-      footer: {
-        text: 'Nanic Ayurveda'
-      },
-      action: {
-        buttons: buttons
-      }
-    }
-  };
-
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-      message,
-      {
-        headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json',
-        }
-      }
-    );
-  } catch (error) {
-    console.error('Interactive message error:', error.response?.data || error.message);
-  }
-};
-
 async function sendWelcomeMessage(phone) {
-  updateActivity();
-  
-  const buttons = [
+  updateActivity(); // Update activity when sending messages
+  await axios.post(
+    `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
     {
-      type: 'reply',
-      reply: {
-        id: 'catalog',
-        title: '🛍️ View Catalog'
+      messaging_product: 'whatsapp',
+      to: phone,
+      text: {
+        body: `🌿 *Welcome to Nanic Ayurveda's WhatsApp Shop!*\n\n🛍️ Just choose a product from our WhatsApp catalog to place your order.\n\nType:\n- *Catalog* to view products\n- *Track* to check your order status`
       }
     },
     {
-      type: 'reply',
-      reply: {
-        id: 'track',
-        title: '📦 Track Order'
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
       }
     }
-  ];
-
-  await sendInteractiveMessage(
-    phone,
-    '🌿 Welcome to Nanic Ayurveda!',
-    'Welcome to our WhatsApp Shop! Choose an option below to get started.',
-    buttons
   );
 }
 
 const sendMessage = async (phone, message) => {
-  updateActivity();
+  updateActivity(); // Update activity when sending messages
   await axios.post(
     `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
     {
@@ -272,168 +157,18 @@ const sendMessage = async (phone, message) => {
   );
 };
 
-// Handle Flow Response
-const handleFlowResponse = async (flowResponse, phone) => {
-  try {
-    const { flow_token, response_json } = flowResponse;
-    const data = JSON.parse(response_json);
-    
-    const session = sessions[phone] || {};
-    
-    // Update session with flow data
-    session.name = data.name;
-    session.email = data.email;
-    session.mobile = data.mobile;
-    session.address = {
-      line: data.address,
-      city: data.city,
-      state: data.state,
-      pincode: data.pincode
-    };
-    
-    // Calculate shipping
-    const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-    session.shipping = shipping;
-    session.totalWithShipping = session.total + shipping;
-    
-    sessions[phone] = session;
-    
-    // Send confirmation with payment
-    const confirmButtons = [
-      {
-        type: 'reply',
-        reply: {
-          id: 'confirm_payment',
-          title: '💳 Proceed to Payment'
-        }
-      },
-      {
-        type: 'reply',
-        reply: {
-          id: 'cancel_order',
-          title: '❌ Cancel Order'
-        }
-      }
-    ];
-    
-    await sendInteractiveMessage(
-      phone,
-      '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
-      confirmButtons
-    );
-    
-  } catch (error) {
-    console.error('Flow response handling error:', error);
-    await sendMessage(phone, '❌ There was an error processing your order. Please try again.');
-  }
-};
-
 app.post('/webhook', async (req, res) => {
-  updateActivity();
+  updateActivity(); // Update activity on webhook calls
   
   const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
   if (!msg) return res.sendStatus(200);
 
   const from = msg.from;
   const type = msg.type;
-  const session = sessions[from] || { step: 'start' };
-
-  // Handle Flow responses
-  if (type === 'interactive' && msg.interactive?.type === 'nfm_reply') {
-    await handleFlowResponse(msg.interactive.nfm_reply, from);
-    return res.sendStatus(200);
-  }
-
-  // Handle interactive button responses
-  if (type === 'interactive' && msg.interactive?.type === 'button_reply') {
-    const buttonId = msg.interactive.button_reply.id;
-    
-    switch (buttonId) {
-      case 'catalog':
-        if (session.lastOrder && session.lastOrder.status === 'Not fulfilled yet') {
-          const orderMsg = `🧾 Your recent order is already being processed.\n\n*ORDER ID:* ${session.lastOrder.name}\n*ORDER DATE:* ${new Date(session.lastOrder.date).toLocaleDateString()}\n*STATUS:* ${session.lastOrder.status}\n\nIf you want to place another order, message *New*.`;
-          await sendMessage(from, orderMsg);
-        } else {
-          await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
-        }
-        break;
-        
-      case 'track':
-        session.step = 'track_order';
-        await sendMessage(from, 'Please enter your *Order ID* to track your order.');
-        sessions[from] = session;
-        break;
-        
-        case 'confirm_payment':
-          session.step = 'payment';
-          
-          // Add validation before creating payment link
-          if (!session.totalWithShipping || !session.name || !session.email || !session.mobile) {
-            console.error('Missing required session data:', {
-              totalWithShipping: session.totalWithShipping,
-              name: session.name,
-              email: session.email,
-              mobile: session.mobile
-            });
-            await sendMessage(from, '❌ Missing order information. Please start over by typing "Hi".');
-            break;
-          }
-        
-          try {
-            console.log('Creating Razorpay payment link with data:', {
-              amount: session.totalWithShipping * 100,
-              currency: 'INR',
-              description: `Order for ${session.name}`,
-              customer: {
-                name: session.name,
-                email: session.email,
-                contact: session.mobile,
-              }
-            });
-        
-            const razorRes = await razorpay.paymentLink.create({
-              amount: session.totalWithShipping * 100,
-              currency: 'INR',
-              description: `Order for ${session.name}`,
-              customer: {
-                name: session.name,
-                email: session.email,
-                contact: session.mobile,
-              },
-              notify: { sms: false, email: false },
-              callback_url: "https://orders.nanic.in/razorpay-webhook",
-              callback_method: "get"
-            });
-        
-            console.log('Razorpay payment link created successfully:', razorRes.id);
-            session.paymentLinkId = razorRes.id;
-            sessions[from] = session;
-            
-            await sendMessage(from, `💳 Complete your payment:\n${razorRes.short_url}\n\nWe'll confirm your order once payment is completed.`);
-          } catch (err) {
-            console.error('Razorpay error details:', {
-              message: err.message,
-              stack: err.stack,
-              response: err.response?.data,
-              statusCode: err.statusCode,
-              error: err.error
-            });
-            await sendMessage(from, '❌ Failed to generate payment link. Please try again.');
-          }
-          break;
-        
-      case 'cancel_order':
-        await sendMessage(from, '❌ Order cancelled. Type "Hi" to start over.');
-        delete sessions[from];
-        break;
-    }
-    
-    return res.sendStatus(200);
-  }
+  const session = sessions[from] || { step: 'cart' };
 
   if (type === 'order') {
-    if (session.step === 'payment' || session.step === 'shopify') {
+    if (session.step !== 'cart') {
       await sendMessage(from, '🛒 Your order is already being processed.');
       return res.sendStatus(200);
     }
@@ -462,38 +197,25 @@ app.post('/webhook', async (req, res) => {
     });
 
     session.total = total;
-    session.step = 'checkout_flow';
+    session.step = 'name';
     sessions[from] = session;
 
-    // Send flow for checkout if flow ID is configured
-    if (FLOW_IDS.CHECKOUT) {
-      const flowData = {
-        cart_summary: summary,
-        total_amount: total.toString(), // Convert to string
-        currency: 'INR'
-      };
-      
-      await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-    } else {
-      // Fallback to traditional method
-      await sendMessage(from, summary + '\n🧾 Please enter your *Name*');
-      session.step = 'name';
-    }
-    
+    await sendMessage(from, summary + '\n🧾 Please enter your *Name*');
     return res.sendStatus(200);
   }
 
   if (type === 'text') {
     const text = msg.text.body.trim();
 
-    if (['hi', 'hello', 'start'].includes(text.toLowerCase())) {
+    if (['hi', 'Hi'].includes(text.toLowerCase())) {
       await sendWelcomeMessage(from);
-      sessions[from] = { step: 'start' };
+      sessions[from] = { step: 'cart' };  // reset session fully
       return res.sendStatus(200);
     }
 
-    // Handle traditional text-based interactions (fallback)
+    // Catalog command
     if (text.toLowerCase() === 'catalog') {
+      // If user has an unfulfilled order
       if (session.lastOrder && session.lastOrder.status === 'Not fulfilled yet') {
         const orderMsg = `🧾 Your recent order is already being processed.\n\n*ORDER ID:* ${session.lastOrder.name}\n*ORDER DATE:* ${new Date(session.lastOrder.date).toLocaleDateString()}\n*STATUS:* ${session.lastOrder.status}\n\nIf you want to place another order, message *New*.`;
         await sendMessage(from, orderMsg);
@@ -504,11 +226,12 @@ app.post('/webhook', async (req, res) => {
     }
 
     if (text.toLowerCase() === 'new') {
-      sessions[from] = { step: 'start' };
+      sessions[from] = { step: 'cart' }; // reset session
       await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
       return res.sendStatus(200);
     }
 
+    // Track command
     if (text.toLowerCase() === 'track') {
       session.step = 'track_order';
       await sendMessage(from, 'Please enter your *Order ID* to track your order.');
@@ -518,7 +241,7 @@ app.post('/webhook', async (req, res) => {
 
     // Tracking order by ID
     if (session.step === 'track_order') {
-      const orderId = text;
+      const orderId = text // Shopify order names are usually uppercase
       try {
         const shopifyRes = await axios.get(
           `https://${SHOP}.myshopify.com/admin/api/2024-04/orders.json?name=${orderId}&status=any`,
@@ -539,20 +262,19 @@ app.post('/webhook', async (req, res) => {
 
           await sendMessage(
             from,
-            `✅ Order ID: ${order.name}\nPayment Status: ${financialStatus}\nFulfillment Status: ${fulfillmentStatus}\n\nMessage *Hi* to restart the bot.`
+            `✅ Order ID: ${order.name}\nPayment Status: ${financialStatus}\nFulfillment Status: ${fulfillmentStatus} \n\n Message *Hi* to restart the bot.`
           );
         }
       } catch (err) {
         console.error('Shopify order lookup error:', err);
-        await sendMessage(from, '❌ Failed to fetch order details. Please try again later.\n\nMessage *Hi* to restart the bot.');
+        await sendMessage(from, '❌ Failed to fetch order details. Please try again later.\n\n Message *Hi* to restart the bot.');
       }
 
-      session.step = 'start';
+      session.step = 'START';
       sessions[from] = session;
       return res.sendStatus(200);
     }
 
-    // Handle traditional checkout flow (fallback when flows are not available)
     switch (session.step) {
       case 'name':
         session.name = text;
@@ -572,6 +294,7 @@ app.post('/webhook', async (req, res) => {
         sessions[from] = session;
 
         try {
+          // Search customer by email
           const customerSearchRes = await axios.get(
             `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=email:${session.email}`,
             {
@@ -587,6 +310,7 @@ app.post('/webhook', async (req, res) => {
             const customer = customers[0];
             session.customerId = customer.id;
 
+            // Get saved addresses
             const addressesRes = await axios.get(
               `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
               {
@@ -601,11 +325,12 @@ app.post('/webhook', async (req, res) => {
             if (addresses.length > 0) {
               const defaultAddr = customer.default_address || addresses[0];
 
+              // Check for completeness
               if (!defaultAddr.address1 || !defaultAddr.city || !defaultAddr.zip) {
                 session.step = 'address_line';
                 await sendMessage(
                   from,
-                  '🏠 Your saved address is incomplete. Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)'
+                  '🏠 Your saved address is incomplete. Please enter your *Address* ( Ex: No 1, Anna Street, Ganapathy Taluk )'
                 );
               } else {
                 session.foundAddress = {
@@ -626,79 +351,41 @@ app.post('/webhook', async (req, res) => {
                 ${session.foundAddress.country}
                 📞 ${session.foundAddress.phone}`.trim();
 
-                const addressButtons = [
-                  {
-                    type: 'reply',
-                    reply: {
-                      id: 'use_address',
-                      title: '✅ Use This Address'
-                    }
-                  },
-                  {
-                    type: 'reply',
-                    reply: {
-                      id: 'new_address',
-                      title: '📝 Enter New Address'
-                    }
-                  }
-                ];
-
-                await sendInteractiveMessage(
-                  from,
-                  '📦 Existing Address Found',
-                  `We found this address:\n${fullAddress}\n\nWould you like to use this address?`,
-                  addressButtons
-                );
-              }
-            } else {
-              session.step = 'address_line';
-              await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
+                await sendMessage(
+                from,
+                `📦 We found an existing address:\n${fullAddress}\n\nDo you want to use this address? Reply *Yes* or *No*.`
+              );
             }
           } else {
             session.step = 'address_line';
-            await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
+            await sendMessage(from, '🏠 Please enter your *Address* ( Ex: No 1, Anna Street, Ganapathy Taluk )');
           }
-        } catch (err) {
-          console.error('Shopify customer/address lookup error:', err?.response?.data || err.message);
+        } else {
           session.step = 'address_line';
-          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
+          await sendMessage(from, '🏠 Please enter your *Address* ( Ex: No 1, Anna Street, Ganapathy Taluk )');
         }
-        break;
+      } catch (err) {
+        console.error('Shopify customer/address lookup error:', err?.response?.data || err.message);
+        session.step = 'address_line';
+        await sendMessage(from, '🏠 Please enter your *Address* ( Ex: No 1, Anna Street, Ganapathy Taluk )');
+      }
+
+      break;
 
       case 'reuse_address':
         if (text.toLowerCase() === 'yes') {
           session.address = { ...session.foundAddress };
-          session.step = 'pincode_confirmed';
-          const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+          session.step = 'pincode_confirmed'; // skip to pincode confirmation logic
+          // You could include the state logic here if needed
+          const shipping = session.address.state.toLowerCase() === 'tn' ? 0 : 0;
           session.shipping = shipping;
           session.totalWithShipping = session.total + shipping;
 
-          const confirmButtons = [
-            {
-              type: 'reply',
-              reply: {
-                id: 'confirm_payment',
-                title: '💳 Proceed to Payment'
-              }
-            },
-            {
-              type: 'reply',
-              reply: {
-                id: 'cancel_order',
-                title: '❌ Cancel Order'
-              }
-            }
-          ];
-
-          await sendInteractiveMessage(
-            phone,
-            '✅ Order Summary',
-            `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
-            confirmButtons
-          );
+          await sendMessage(from, `✅ Total: ₹${session.total}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nReply *YES* to continue to payment.`);
+          session.step = 'confirm';
         } else if (text.toLowerCase() === 'no') {
-          session.step = 'address_line';
-          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
+          session.step = 'mobile';
+          await sendMessage(from, '📱 Please enter your *Mobile Number*');
         } else {
           await sendMessage(from, '❓ Please reply with *Yes* or *No*.');
         }
@@ -713,7 +400,7 @@ app.post('/webhook', async (req, res) => {
       case 'city':
         session.address.city = text;
         session.step = 'state';
-        await sendMessage(from, '🌆 Please enter your *State*.\n*NOTE:* If Tamil Nadu enter *TN*');
+        await sendMessage(from, '🌆 Please enter your *State*. \n *NOTE:* If Tamil Nadu enter *TN* ');
         break;
 
       case 'state':
@@ -727,30 +414,39 @@ app.post('/webhook', async (req, res) => {
         const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
         session.shipping = shipping;
         session.totalWithShipping = session.total + shipping;
+        session.step = 'confirm';
 
-        const confirmButtons = [
-          {
-            type: 'reply',
-            reply: {
-              id: 'confirm_payment',
-              title: '💳 Proceed to Payment'
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'cancel_order',
-              title: '❌ Cancel Order'
-            }
+        await sendMessage(from, `✅ Total: ₹${session.total}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nReply *YES* to continue to payment.`);
+        break;
+
+      case 'confirm':
+        if (text.toLowerCase() === 'yes') {
+          session.step = 'payment';
+          try {
+            const razorRes = await razorpay.paymentLink.create({
+              amount: session.totalWithShipping * 100,
+              currency: 'INR',
+              description: `Order for ${session.name}`,
+              customer: {
+                name: session.name,
+                email: session.email,
+                contact: session.mobile,
+              },
+              notify: { sms: false, email: false },
+              callback_url: "https://wpbot.nanic.in/razorpay-webhook",
+              callback_method: "get"
+            });
+
+            session.paymentLinkId = razorRes.id;
+            await sendMessage(from, `💳 Pay here:\n${razorRes.short_url}\n\nWe'll confirm your order once payment is completed.`);
+          } catch (err) {
+            console.error('Razorpay error:', err);
+            await sendMessage(from, '❌ Failed to generate payment link.');
           }
-        ];
-
-        await sendInteractiveMessage(
-          from,
-          '✅ Order Confirmation',
-          `Total: ₹${session.total}\nShipping: ₹${shipping}\n*Grand Total: ₹${session.totalWithShipping}*`,
-          confirmButtons
-        );
+        } else {
+          await sendMessage(from, '❌ Cancelled. Type "Hi" to begin again.');
+          delete sessions[from];
+        }
         break;
 
       case 'payment':
@@ -762,64 +458,11 @@ app.post('/webhook', async (req, res) => {
         break;
 
       default:
-        await sendWelcomeMessage(from);
+        await sendMessage(from, `❓ I didn't understand that. Please type:\n- *Catalog* to view products\n- *Track* to track your order`);
         break;
     }
 
     sessions[from] = session;
-  }
-
-  // Handle interactive button responses for address selection
-  if (type === 'interactive' && msg.interactive?.type === 'button_reply') {
-    const buttonId = msg.interactive.button_reply.id;
-    
-    if (buttonId === 'use_address') {
-      session.address = { ...session.foundAddress };
-      const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-      session.shipping = shipping;
-      session.totalWithShipping = session.total + shipping;
-
-      // Debug session data before sending confirmation
-      console.log('Session data after flow response:', {
-        name: session.name,
-        email: session.email,
-        mobile: session.mobile,
-        total: session.total,
-        shipping: session.shipping,
-        totalWithShipping: session.totalWithShipping
-      });
-
-      // Send confirmation with payment
-      const confirmButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'confirm_payment',
-            title: '💳 Proceed to Payment'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'cancel_order',
-            title: '❌ Cancel Order'
-          }
-        }
-      ];
-
-      await sendInteractiveMessage(
-        from,
-        '✅ Order Confirmation',
-        `Total: ₹${session.total}\nShipping: ₹${shipping}\n*Grand Total: ₹${session.totalWithShipping}*`,
-        confirmButtons
-      );
-      
-      sessions[from] = session;
-    } else if (buttonId === 'new_address') {
-      session.step = 'address_line';
-      await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-      sessions[from] = session;
-    }
   }
 
   res.sendStatus(200);
@@ -851,9 +494,9 @@ app.get('/api/activity-status', (req, res) => {
   });
 });
 
-// Razorpay Webhook
+// ✅ Razorpay Webhook
 app.post('/razorpay-webhook', express.json(), async (req, res) => {
-  updateActivity();
+  updateActivity(); // Update activity on webhook calls
   
   const event = req.body;
 
@@ -871,11 +514,12 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
       const shippingAddress = {
         address1: session.address.line,
         city: session.address.city,
-        province: session.address.state,
+        province: "Tamil Nadu",
         zip: session.address.pincode,
         country: "India"
       };
 
+      // 1. Search for existing customer by phone number
       const customerSearchRes = await axios.get(
         `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${phone}`,
         {
@@ -890,11 +534,13 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
         customerId = customerSearchRes.data.customers[0].id;
       }
 
+      // 2. Prepare order payload conditionally
       const orderPayload = {
         order: {
+          // email: session.email,
           customer: {
-            id: session.customerId
-          },
+        id: session.customerId // ✅ Use existing customer ID only
+      },
           line_items: session.cart.map(item => ({
             title: item.name,
             quantity: item.quantity,
@@ -940,6 +586,7 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
         };
       }
 
+      // 3. Create order
       const orderRes = await axios.post(
         `https://${SHOP}.myshopify.com/admin/api/2024-04/orders.json`,
         orderPayload,
@@ -958,7 +605,7 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
         status: order.fulfillment_status || 'Not fulfilled yet',
       };
 
-      await sendMessage(phone, `✅ Order placed! 🧾\nOrder ID: *${order.name}*\nThank you for shopping with us!\n\nTo track your order send *Hi*`);
+      await sendMessage(phone, `✅ Order placed! 🧾\nOrder ID: *${order.name}*\nThank you for shopping with us! \n\nTo track your order send *Hi*`);
 
     } catch (err) {
       console.error('Shopify Error:', err?.response?.data || err.message || err);
@@ -993,5 +640,4 @@ app.listen(PORT, () => {
   console.log(`✅ WhatsApp Bot running at http://localhost:${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`⏰ Keep-alive monitoring: ${(process.env.KEEP_ALIVE_URL) ? 'ENABLED' : 'DISABLED'}`);
-  console.log(`🔄 WhatsApp Flows: ${(FLOW_IDS.CHECKOUT) ? 'ENABLED' : 'DISABLED (using fallback)'}`);
 });
