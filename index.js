@@ -851,7 +851,106 @@ app.get('/api/activity-status', (req, res) => {
   });
 });
 
-// Razorpay Webhook
+// GET route for Razorpay webhook callback (to close the tab)
+app.get('/razorpay-webhook', (req, res) => {
+  console.log('GET /razorpay-webhook accessed');
+  updateActivity();
+  
+  // Send HTML page that will close the tab
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - Nanic Ayurveda</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        .success-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+        p {
+            margin: 0 0 20px 0;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h1>Payment Successful!</h1>
+        <p>Your order has been placed successfully. You will receive a confirmation message on WhatsApp shortly.</p>
+        <p><span class="loading"></span>Closing this tab automatically...</p>
+    </div>
+    
+    <script>
+        // Close the tab after 3 seconds
+        setTimeout(() => {
+            window.close();
+            
+            // Fallback: if window.close() doesn't work, redirect to a blank page
+            setTimeout(() => {
+                if (!window.closed) {
+                    window.location.href = 'about:blank';
+                }
+            }, 1000);
+        }, 3000);
+        
+        // Also try to close on page visibility change (when user switches tabs)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                setTimeout(() => {
+                    window.close();
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>`;
+
+  res.send(html);
+});
+
+// Razorpay Webhook POST handler
 app.post('/razorpay-webhook', express.json(), async (req, res) => {
   updateActivity();
   
@@ -976,104 +1075,6 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
   }
 
   res.sendStatus(400);
-});
-
-// GET route for Razorpay webhook callback (to close the tab)
-app.get('/razorpay-webhook', (req, res) => {
-  updateActivity();
-  
-  // Send HTML page that will close the tab
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Successful - Nanic Ayurveda</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-        }
-        .container {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-            width: 90%;
-        }
-        .success-icon {
-            font-size: 60px;
-            margin-bottom: 20px;
-        }
-        h1 {
-            margin: 0 0 10px 0;
-            font-size: 24px;
-        }
-        p {
-            margin: 0 0 20px 0;
-            opacity: 0.9;
-            line-height: 1.5;
-        }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="success-icon">✅</div>
-        <h1>Payment Successful!</h1>
-        <p>Your order has been placed successfully. You will receive a confirmation message on WhatsApp shortly.</p>
-        <p><span class="loading"></span>Closing this tab automatically...</p>
-    </div>
-    
-    <script>
-        // Close the tab after 3 seconds
-        setTimeout(() => {
-            window.close();
-            
-            // Fallback: if window.close() doesn't work, redirect to a blank page
-            setTimeout(() => {
-                if (!window.closed) {
-                    window.location.href = 'about:blank';
-                }
-            }, 1000);
-        }, 3000);
-        
-        // Also try to close on page visibility change (when user switches tabs)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                setTimeout(() => {
-                    window.close();
-                }, 1000);
-            }
-        });
-    </script>
-</body>
-</html>`;
-
-  res.send(html);
 });
 
 // Graceful shutdown
