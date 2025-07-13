@@ -402,8 +402,19 @@ app.post('/webhook', async (req, res) => {
                 contact: session.mobile,
               },
               notify: { sms: false, email: false },
-              callback_url: "https://orders.nanic.in/razorpay-webhook",
-              callback_method: "get"
+              callback_url: "https://wpbot.nanic.in/razorpay-webhook",
+              callback_method: "get",
+              options: {
+                checkout: {
+                  name: "Nanic Ayurveda",
+                  description: "Ayurvedic Products",
+                  prefill: {
+                    name: session.name,
+                    email: session.email,
+                    contact: session.mobile
+                  }
+                }
+              }
             });
         
             console.log('Razorpay payment link created successfully:', razorRes.id);
@@ -853,8 +864,12 @@ app.get('/api/activity-status', (req, res) => {
 
 // GET route for Razorpay webhook callback (to close the tab)
 app.get('/razorpay-webhook', (req, res) => {
-  console.log('GET /razorpay-webhook accessed');
+  console.log('GET /razorpay-webhook accessed with query params:', req.query);
   updateActivity();
+  
+  // Log all query parameters for debugging
+  const queryParams = req.query;
+  console.log('Query parameters received:', JSON.stringify(queryParams, null, 2));
   
   // Send HTML page that will close the tab
   const html = `
@@ -863,42 +878,70 @@ app.get('/razorpay-webhook', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Payment Successful - Nanic Ayurveda</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
             color: white;
+            position: relative;
         }
+        
         .container {
             text-align: center;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 40px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 40px 30px;
             border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
             max-width: 400px;
             width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        
         .success-icon {
             font-size: 60px;
             margin-bottom: 20px;
+            animation: bounce 0.6s ease-in-out;
         }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
         h1 {
-            margin: 0 0 10px 0;
+            margin: 0 0 15px 0;
             font-size: 24px;
+            font-weight: 600;
         }
+        
         p {
             margin: 0 0 20px 0;
-            opacity: 0.9;
-            line-height: 1.5;
+            opacity: 0.95;
+            line-height: 1.6;
+            font-size: 16px;
         }
+        
         .loading {
             display: inline-block;
             width: 20px;
@@ -909,8 +952,47 @@ app.get('/razorpay-webhook', (req, res) => {
             animation: spin 1s ease-in-out infinite;
             margin-right: 10px;
         }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+        
+        .close-info {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        
+        .manual-close {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .manual-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        /* Ensure the page is always visible */
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            p {
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -920,34 +1002,104 @@ app.get('/razorpay-webhook', (req, res) => {
         <h1>Payment Successful!</h1>
         <p>Your order has been placed successfully. You will receive a confirmation message on WhatsApp shortly.</p>
         <p><span class="loading"></span>Closing this tab automatically...</p>
+        <div class="close-info">If the tab doesn't close automatically, you can close it manually.</div>
+        <button class="manual-close" onclick="closeTab()">Close Tab Now</button>
     </div>
     
     <script>
-        // Close the tab after 3 seconds
-        setTimeout(() => {
-            window.close();
-            
-            // Fallback: if window.close() doesn't work, redirect to a blank page
-            setTimeout(() => {
-                if (!window.closed) {
-                    window.location.href = 'about:blank';
-                }
-            }, 1000);
-        }, 3000);
-        
-        // Also try to close on page visibility change (when user switches tabs)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                setTimeout(() => {
-                    window.close();
-                }, 1000);
+        // Function to close tab
+        function closeTab() {
+            try {
+                window.close();
+                console.log('Manual close attempted');
+            } catch (e) {
+                console.log('Manual close failed:', e);
+                window.location.href = 'about:blank';
             }
+        }
+        
+        // Ensure the page is fully loaded before attempting to close
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Payment success page loaded');
+            console.log('Current URL:', window.location.href);
+            console.log('Query parameters:', window.location.search);
+            
+            // Force focus to ensure the page is visible
+            window.focus();
+            
+            // Ensure the page is visible by scrolling to top
+            window.scrollTo(0, 0);
+            
+            // Close the tab after 3 seconds
+            setTimeout(() => {
+                closeTab();
+            }, 3000);
+            
+            // Also try to close on page visibility change (when user switches tabs)
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    setTimeout(() => {
+                        closeTab();
+                    }, 1000);
+                }
+            });
+            
+            // Additional fallback: try to close when user clicks anywhere on the page
+            document.addEventListener('click', (e) => {
+                // Don't trigger if clicking the manual close button
+                if (!e.target.classList.contains('manual-close')) {
+                    setTimeout(() => {
+                        closeTab();
+                    }, 500);
+                }
+            });
+            
+            // Try to close when page loses focus
+            window.addEventListener('blur', () => {
+                setTimeout(() => {
+                    closeTab();
+                }, 1000);
+            });
         });
+        
+        // Handle any errors that might prevent the page from displaying
+        window.addEventListener('error', function(e) {
+            console.log('Page error detected:', e.error);
+        });
+        
+        // Ensure the page loads even with query parameters
+        if (window.location.search) {
+            console.log('Query parameters detected:', window.location.search);
+            // Force a repaint to ensure visibility
+            setTimeout(() => {
+                document.body.style.display = 'none';
+                document.body.offsetHeight; // Force reflow
+                document.body.style.display = 'flex';
+            }, 100);
+        }
     </script>
 </body>
 </html>`;
 
   res.send(html);
+});
+
+// Additional route to handle Razorpay redirects with different patterns
+app.get('/payment-success', (req, res) => {
+  console.log('GET /payment-success accessed with query params:', req.query);
+  updateActivity();
+  
+  // Redirect to the main webhook route
+  res.redirect('/razorpay-webhook' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''));
+});
+
+// Test route to verify webhook page is working
+app.get('/test-payment-success', (req, res) => {
+  console.log('GET /test-payment-success accessed');
+  updateActivity();
+  
+  // Redirect to the main webhook route for testing
+  res.redirect('/razorpay-webhook');
 });
 
 // Razorpay Webhook POST handler
@@ -1099,4 +1251,6 @@ app.listen(PORT, () => {
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`⏰ Keep-alive monitoring: ${(process.env.KEEP_ALIVE_URL) ? 'ENABLED' : 'DISABLED'}`);
   console.log(`🔄 WhatsApp Flows: ${(FLOW_IDS.CHECKOUT) ? 'ENABLED' : 'DISABLED (using fallback)'}`);
+  console.log(`💳 Razorpay webhook URL: https://wpbot.nanic.in/razorpay-webhook`);
+  console.log(`🔗 Payment success URL: https://wpbot.nanic.in/payment-success`);
 });
