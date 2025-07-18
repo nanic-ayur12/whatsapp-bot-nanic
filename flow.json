@@ -305,12 +305,17 @@
                       "name": "ORDER_CONFIRMATION"
                     },
                     "payload": {
-                      "customer": "${data.customer}",
-                      "address": "${data.address}",
-                      "delivery_type": "${!data.delivery_type || data.delivery_type === '' ? 'Not chosen' : (data.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address')}",
+                      "customer_name": "${form.customer.name}",
+                      "customer_email": "${form.customer.email}",
+                      "customer_mobile": "${form.customer.mobile}",
+                      "address_line1": "${form.address.line1}",
+                      "address_city": "${form.address.city}",
+                      "address_state": "${form.address.state}",
+                      "address_pincode": "${form.address.pincode}",
+                      "delivery_type": "${form.delivery_type}",
                       "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
-                      "order_id": "ORD-${data.customer.mobile}",
-                      "total_amount": "800"
+                      "order_id": "ORD-${form.customer.mobile}",
+                      "total_amount": "${data.total_amount}"
                     }
                   }
                 }
@@ -392,13 +397,17 @@
                   "on-click-action": {
                     "name": "complete",
                     "payload": {
-                      "customer": "${data.customer}",
-                      "address_line1": "${data.address.line1}",
-                      "address_city": "${data.address.city}",
-                      "address_state": "${data.address.state}",
-                      "address_pincode": "${data.address.pincode}",
+                      "customer_name": "${data.customer_name}",
+                      "customer_email": "${data.customer_email}",
+                      "customer_mobile": "${data.customer_mobile}",
+                      "address_line1": "${data.address_line1}",
+                      "address_city": "${data.address_city}",
+                      "address_state": "${data.address_state}",
+                      "address_pincode": "${data.address_pincode}",
                       "delivery_type": "${data.delivery_type}",
-                      "discount_code": "${data.discount_code}"
+                      "discount_code": "${data.discount_code}",
+                      "order_id": "${data.order_id}",
+                      "total_amount": "${data.total_amount}"
                     }
                   }
                 }

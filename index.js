@@ -323,9 +323,9 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const session = sessions[phone] || {};
 
     // Update session with flow data (supporting new fields)
-    session.name = data.customer?.name || '';
-    session.email = data.customer?.email || '';
-    session.mobile = data.customer?.mobile || '';
+    session.name = data.customer_name || '';
+    session.email = data.customer_email || '';
+    session.mobile = data.customer_mobile || '';
     session.address = {
       line: data.address_line1 || '',
       city: data.address_city || '',
@@ -334,7 +334,8 @@ const handleFlowResponse = async (flowResponse, phone) => {
     };
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
-    session.pincode_validated = data.validated === 'true';
+    session.order_id = data.order_id || '';
+    session.totalWithShipping = parseInt(data.total_amount) || 0;
 
     // Delivery type logic
     let shipping = 0;
@@ -357,7 +358,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     let discountAmount = 0;
     let discountMsg = '';
     if (session.discount_code) {
-      const discountRes = await validateDiscountCode(session.discount_code, session.total);
+      const discountRes = await validateDiscountCode(session.discount_code, session.totalWithShipping);
       if (discountRes.valid) {
         discountAmount = discountRes.amount;
         session.discount_value = discountAmount;
@@ -370,7 +371,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
       session.discount_value = 0;
     }
 
-    session.totalWithShipping = session.total + shipping - discountAmount;
+    session.totalWithShipping = session.totalWithShipping + shipping - discountAmount;
     if (session.totalWithShipping < 0) session.totalWithShipping = 0;
     sessions[phone] = session;
 
@@ -395,7 +396,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     await sendInteractiveMessage(
       phone,
       '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.totalWithShipping}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
       confirmButtons
     );
   } catch (error) {
