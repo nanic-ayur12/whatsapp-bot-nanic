@@ -187,6 +187,18 @@ const sendFlowMessage = async (phone, flowId, flowData = {}) => {
 const sendInteractiveMessage = async (phone, headerText, bodyText, buttons) => {
   updateActivity();
   
+  // Support for catalog buttons
+  const formattedButtons = buttons.map(btn => {
+    if (btn.type === 'catalog') {
+      return {
+        type: 'catalog',
+        catalog_id: btn.catalog_id,
+        title: btn.title
+      };
+    }
+    return btn;
+  });
+
   const message = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -205,7 +217,7 @@ const sendInteractiveMessage = async (phone, headerText, bodyText, buttons) => {
         text: 'Nanic Ayurveda'
       },
       action: {
-        buttons: buttons
+        buttons: formattedButtons
       }
     }
   };
@@ -231,11 +243,9 @@ async function sendWelcomeMessage(phone) {
   
   const buttons = [
     {
-      type: 'reply',
-      reply: {
-        id: 'catalog',
-        title: '🛍️ View Catalog'
-      }
+      type: 'catalog',
+      catalog_id: WHATSAPP_CATALOG_ID,
+      title: '🛍️ View Catalog'
     },
     {
       type: 'reply',
