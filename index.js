@@ -233,9 +233,11 @@ async function sendWelcomeMessage(phone) {
   
   const buttons = [
     {
-      type: 'url',
-      url: 'https://wa.me/c/919682564373', // WhatsApp catalog link
-      title: '🛍️ View Catalog'
+      type: 'reply',
+      reply: {
+        id: 'catalog',
+        title: '🛍️ View Catalog'
+      }
     },
     {
       type: 'reply',
