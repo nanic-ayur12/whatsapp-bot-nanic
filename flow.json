@@ -148,17 +148,13 @@
                       "name": "DELIVERY_OPTIONS"
                     },
                     "payload": {
-                      "customer": {
-                        "name": "${form.customer.name}",
-                        "email": "${form.customer.email}",
-                        "mobile": "${form.customer.mobile}"
-                      },
-                      "address": {
-                        "line1": "${form.address.line1}",
-                        "city": "${form.address.city}",
-                        "state": "${form.address.state}",
-                        "pincode": "${form.address.pincode}"
-                      }
+                      "customer": "${form.customer.name}",
+                      "email": "${form.customer.email}",
+                      "mobile": "${form.customer.mobile}",
+                      "address_line1": "${form.address.line1}",
+                      "address_city": "${form.address.city}",
+                      "address_state": "${form.address.state}",
+                      "address_pincode": "${form.address.pincode}"
                     }
                   }
                 }
@@ -235,7 +231,12 @@
                     },
                     "payload": {
                       "customer": "${data.customer}",
-                      "address": "${data.address}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
+                      "address_line1": "${data.address_line1}",
+                      "address_city": "${data.address_city}",
+                      "address_state": "${data.address_state}",
+                      "address_pincode": "${data.address_pincode}",
                       "delivery_type": "${form.delivery_type}"
                     }
                   }
@@ -305,9 +306,9 @@
                       "name": "ORDER_CONFIRMATION"
                     },
                     "payload": {
-                      "customer_name": "${form.customer.name}",
-                      "customer_email": "${form.customer.email}",
-                      "customer_mobile": "${form.customer.mobile}",
+                      "customer": "${form.customer.name}",
+                      "email": "${form.customer.email}",
+                      "mobile": "${form.customer.mobile}",
                       "address_line1": "${form.address.line1}",
                       "address_city": "${form.address.city}",
                       "address_state": "${form.address.state}",
@@ -397,9 +398,9 @@
                   "on-click-action": {
                     "name": "complete",
                     "payload": {
-                      "customer_name": "${data.customer_name}",
-                      "customer_email": "${data.customer_email}",
-                      "customer_mobile": "${data.customer_mobile}",
+                      "customer": "${data.customer}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
                       "address_line1": "${data.address_line1}",
                       "address_city": "${data.address_city}",
                       "address_state": "${data.address_state}",

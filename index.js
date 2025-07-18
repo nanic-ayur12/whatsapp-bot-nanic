@@ -323,9 +323,9 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const session = sessions[phone] || {};
 
     // Update session with flow data (supporting new fields)
-    session.name = data.customer_name || '';
-    session.email = data.customer_email || '';
-    session.mobile = data.customer_mobile || '';
+    session.name = data.customer || '';
+    session.email = data.email || '';
+    session.mobile = data.mobile || '';
     session.address = {
       line: data.address_line1 || '',
       city: data.address_city || '',
