@@ -322,14 +322,14 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const session = sessions[phone] || {};
 
     // Update session with flow data (supporting new fields)
-    session.name = data.name;
-    session.email = data.email;
-    session.mobile = data.mobile;
+    session.name = data.customer?.name;
+    session.email = data.customer?.email;
+    session.mobile = data.customer?.mobile;
     session.address = {
-      line: data.address,
-      city: data.city,
-      state: data.state,
-      pincode: data.pincode
+      line: data.address?.line1,
+      city: data.address?.city,
+      state: data.address?.state,
+      pincode: data.address?.pincode
     };
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';

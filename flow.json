@@ -36,29 +36,33 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "💰 Total Amount: ₹${data.total_amount}"
+                  "text": "💰 Total Amount:"
                 },
+                {
+                    "type": "TextBody",
+                    "text": "${data.total_amount}"
+                  },
                 {
                   "type": "TextSubheading",
                   "text": "📋 Your Information"
                 },
                 {
                   "type": "TextInput",
-                  "name": "name",
+                  "name": "customer.name",
                   "label": "Full Name",
                   "required": true,
                   "input-type": "text"
                 },
                 {
                   "type": "TextInput",
-                  "name": "email",
+                  "name": "customer.email",
                   "label": "Email Address",
                   "required": true,
                   "input-type": "email"
                 },
                 {
                   "type": "TextInput",
-                  "name": "mobile",
+                  "name": "customer.mobile",
                   "label": "Mobile Number",
                   "required": true,
                   "input-type": "phone"
@@ -69,7 +73,7 @@
                 },
                 {
                   "type": "TextInput",
-                  "name": "address",
+                  "name": "address.line1",
                   "label": "Address Line",
                   "required": true,
                   "input-type": "text",
@@ -77,204 +81,66 @@
                 },
                 {
                   "type": "TextInput",
-                  "name": "pincode",
-                  "label": "Pincode",
+                  "name": "address.city",
+                  "label": "City",
                   "required": true,
-                  "input-type": "number",
-                  "helper-text": "Enter 6-digit pincode - city and state will be auto-filled"
+                  "input-type": "text"
                 },
                 {
-                  "type": "TextBody",
-                  "text": "💡 City and State will be auto-filled after pincode validation"
+                  "type": "Dropdown",
+                  "name": "address.state",
+                  "label": "State",
+                  "required": true,
+                  "data-source": [
+                    { "id": "TN", "title": "Tamil Nadu" },
+                    { "id": "KA", "title": "Karnataka" },
+                    { "id": "AP", "title": "Andhra Pradesh" },
+                    { "id": "TS", "title": "Telangana" },
+                    { "id": "KL", "title": "Kerala" },
+                    { "id": "PY", "title": "Puducherry" },
+                    { "id": "MH", "title": "Maharashtra" },
+                    { "id": "GJ", "title": "Gujarat" },
+                    { "id": "RJ", "title": "Rajasthan" },
+                    { "id": "MP", "title": "Madhya Pradesh" },
+                    { "id": "UP", "title": "Uttar Pradesh" },
+                    { "id": "BR", "title": "Bihar" },
+                    { "id": "WB", "title": "West Bengal" },
+                    { "id": "OD", "title": "Odisha" },
+                    { "id": "JH", "title": "Jharkhand" },
+                    { "id": "CG", "title": "Chhattisgarh" },
+                    { "id": "HR", "title": "Haryana" },
+                    { "id": "PB", "title": "Punjab" },
+                    { "id": "HP", "title": "Himachal Pradesh" },
+                    { "id": "UT", "title": "Uttarakhand" },
+                    { "id": "DL", "title": "Delhi" },
+                    { "id": "AS", "title": "Assam" },
+                    { "id": "AR", "title": "Arunachal Pradesh" },
+                    { "id": "MN", "title": "Manipur" },
+                    { "id": "ML", "title": "Meghalaya" },
+                    { "id": "MZ", "title": "Mizoram" },
+                    { "id": "NL", "title": "Nagaland" },
+                    { "id": "SK", "title": "Sikkim" },
+                    { "id": "TR", "title": "Tripura" },
+                    { "id": "GA", "title": "Goa" },
+                    { "id": "AN", "title": "Andaman and Nicobar Islands" },
+                    { "id": "CH", "title": "Chandigarh" },
+                    { "id": "DN", "title": "Dadra and Nagar Haveli" },
+                    { "id": "DD", "title": "Daman and Diu" },
+                    { "id": "JK", "title": "Jammu and Kashmir" },
+                    { "id": "LA", "title": "Ladakh" },
+                    { "id": "LD", "title": "Lakshadweep" }
+                  ]
+                },
+                {
+                  "type": "TextInput",
+                  "name": "address.pincode",
+                  "label": "Pincode",
+                  "required": true,
+                  "input-type": "number"
                 },
                 {
                   "type": "Footer",
                   "label": "Continue",
-                  "on-click-action": {
-                    "name": "data_exchange",
-                    "payload": {
-                      "name": "${form.name}",
-                      "email": "${form.email}",
-                      "mobile": "${form.mobile}",
-                      "address": "${form.address}",
-                      "pincode": "${form.pincode}",
-                      "cart_summary": "${data.cart_summary}",
-                      "total_amount": "${data.total_amount}"
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "action": {
-          "name": "data_exchange",
-          "data_exchange": {
-            "method": "GET",
-            "url": "https://wpbot.nanic.in/api/pincode/${form.pincode}"
-          },
-          "next": {
-            "type": "screen",
-            "name": "PINCODE_VALIDATION"
-          }
-        }
-      },
-      {
-        "id": "PINCODE_VALIDATION",
-        "title": "Validating Address",
-        "terminal": false,
-        "data": {
-          "name": {
-            "type": "string",
-            "__example__": "John Doe"
-          },
-          "email": {
-            "type": "string",
-            "__example__": "john.doe@email.com"
-          },
-          "mobile": {
-            "type": "string",
-            "__example__": "+91 9876543210"
-          },
-          "address": {
-            "type": "string",
-            "__example__": "No 1, Anna Street, Ganapathy Taluk"
-          },
-          "pincode": {
-            "type": "string",
-            "__example__": "641006"
-          },
-          "city": {
-            "type": "string",
-            "__example__": "Coimbatore"
-          },
-          "state": {
-            "type": "string",
-            "__example__": "Tamil Nadu"
-          },
-          "cart_summary": {
-            "type": "string",
-            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
-          }
-        },
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            {
-              "type": "Form",
-              "name": "validation_form",
-              "children": [
-                {
-                  "type": "TextHeading",
-                  "text": "📍 Address Validation"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "We've fetched the following details based on your pincode. Please verify if they are correct."
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "📋 Customer Details"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "Name: ${data.name}\nEmail: ${data.email}\nMobile: ${data.mobile}\nAddress: ${data.address}"
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "🔍 Auto-filled Location Details"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "Pincode: ${data.pincode}\nCity: ${data.city}\nState: ${data.state}"
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "✅ Are these details correct?"
-                },
-                {
-                  "type": "RadioButtonsGroup",
-                  "name": "details_correct",
-                  "label": "Verification",
-                  "required": true,
-                  "data-source": [
-                    {
-                      "id": "yes",
-                      "title": "✅ Yes, details are correct",
-                      "description": "Proceed with these details"
-                    },
-                    {
-                      "id": "no",
-                      "title": "❌ No, I need to edit",
-                      "description": "Let me correct the city/state"
-                    }
-                  ]
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "📝 Edit Details (if needed)"
-                },
-                {
-                  "type": "TextInput",
-                  "name": "city_edit",
-                  "label": "City",
-                  "required": false,
-                  "input-type": "text",
-                  "helper-text": "Only fill if you need to correct the city"
-                },
-                {
-                  "type": "Dropdown",
-                  "name": "state_edit",
-                  "label": "State",
-                  "required": false,
-                  "data-source": [
-                    { "id": "keep_current", "title": "Keep current state" },
-                    { "id": "Tamil Nadu", "title": "Tamil Nadu" },
-                    { "id": "Karnataka", "title": "Karnataka" },
-                    { "id": "Andhra Pradesh", "title": "Andhra Pradesh" },
-                    { "id": "Telangana", "title": "Telangana" },
-                    { "id": "Kerala", "title": "Kerala" },
-                    { "id": "Puducherry", "title": "Puducherry" },
-                    { "id": "Maharashtra", "title": "Maharashtra" },
-                    { "id": "Gujarat", "title": "Gujarat" },
-                    { "id": "Rajasthan", "title": "Rajasthan" },
-                    { "id": "Madhya Pradesh", "title": "Madhya Pradesh" },
-                    { "id": "Uttar Pradesh", "title": "Uttar Pradesh" },
-                    { "id": "Bihar", "title": "Bihar" },
-                    { "id": "West Bengal", "title": "West Bengal" },
-                    { "id": "Odisha", "title": "Odisha" },
-                    { "id": "Jharkhand", "title": "Jharkhand" },
-                    { "id": "Chhattisgarh", "title": "Chhattisgarh" },
-                    { "id": "Haryana", "title": "Haryana" },
-                    { "id": "Punjab", "title": "Punjab" },
-                    { "id": "Himachal Pradesh", "title": "Himachal Pradesh" },
-                    { "id": "Uttarakhand", "title": "Uttarakhand" },
-                    { "id": "Delhi", "title": "Delhi" },
-                    { "id": "Assam", "title": "Assam" },
-                    { "id": "Arunachal Pradesh", "title": "Arunachal Pradesh" },
-                    { "id": "Manipur", "title": "Manipur" },
-                    { "id": "Meghalaya", "title": "Meghalaya" },
-                    { "id": "Mizoram", "title": "Mizoram" },
-                    { "id": "Nagaland", "title": "Nagaland" },
-                    { "id": "Sikkim", "title": "Sikkim" },
-                    { "id": "Tripura", "title": "Tripura" },
-                    { "id": "Goa", "title": "Goa" },
-                    { "id": "Andaman and Nicobar Islands", "title": "Andaman and Nicobar Islands" },
-                    { "id": "Chandigarh", "title": "Chandigarh" },
-                    { "id": "Dadra and Nagar Haveli", "title": "Dadra and Nagar Haveli" },
-                    { "id": "Daman and Diu", "title": "Daman and Diu" },
-                    { "id": "Jammu and Kashmir", "title": "Jammu and Kashmir" },
-                    { "id": "Ladakh", "title": "Ladakh" },
-                    { "id": "Lakshadweep", "title": "Lakshadweep" }
-                  ]
-                },
-                {
-                  "type": "Footer",
-                  "label": "Confirm & Continue",
                   "on-click-action": {
                     "name": "navigate",
                     "next": {
@@ -282,16 +148,17 @@
                       "name": "DELIVERY_OPTIONS"
                     },
                     "payload": {
-                      "name": "${data.name}",
-                      "email": "${data.email}",
-                      "mobile": "${data.mobile}",
-                      "address": "${data.address}",
-                      "city": "${form.city_edit ? form.city_edit : data.city}",
-                      "state": "${form.state_edit == 'keep_current' ? data.state : (form.state_edit ? form.state_edit : data.state)}",
-                      "pincode": "${data.pincode}",
-                      "cart_summary": "${data.cart_summary}",
-                      "total_amount": "${data.total_amount}",
-                      "validated": "true"
+                      "customer": {
+                        "name": "${form.customer.name}",
+                        "email": "${form.customer.email}",
+                        "mobile": "${form.customer.mobile}"
+                      },
+                      "address": {
+                        "line1": "${form.address.line1}",
+                        "city": "${form.address.city}",
+                        "state": "${form.address.state}",
+                        "pincode": "${form.address.pincode}"
+                      }
                     }
                   }
                 }
@@ -305,45 +172,22 @@
         "title": "Delivery Options",
         "terminal": false,
         "data": {
-          "name": {
-            "type": "string",
-            "__example__": "John Doe"
-          },
-          "email": {
-            "type": "string",
-            "__example__": "john.doe@email.com"
-          },
-          "mobile": {
-            "type": "string",
-            "__example__": "+91 9876543210"
+          "customer": {
+            "type": "object",
+            "__example__": {
+              "name": "John Doe",
+              "email": "john.doe@email.com",
+              "mobile": "+91 9876543210"
+            }
           },
           "address": {
-            "type": "string",
-            "__example__": "No 1, Anna Street, Ganapathy Taluk"
-          },
-          "city": {
-            "type": "string",
-            "__example__": "Coimbatore"
-          },
-          "state": {
-            "type": "string",
-            "__example__": "Tamil Nadu"
-          },
-          "pincode": {
-            "type": "string",
-            "__example__": "641006"
-          },
-          "cart_summary": {
-            "type": "string",
-            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
-          },
-          "validated": {
-            "type": "string",
-            "__example__": "true"
+            "type": "object",
+            "__example__": {
+              "line1": "No 1, Anna Street, Ganapathy Taluk",
+              "city": "Coimbatore",
+              "state": "TN",
+              "pincode": "641006"
+            }
           }
         },
         "layout": {
@@ -356,14 +200,6 @@
                 {
                   "type": "TextHeading",
                   "text": "🚚 Choose Delivery Method"
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "📍 Delivery Address"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "${data.name}\n${data.address}\n${data.city}, ${data.state} - ${data.pincode}\nMobile: ${data.mobile}"
                 },
                 {
                   "type": "RadioButtonsGroup",
@@ -384,12 +220,9 @@
                   ]
                 },
                 {
-                  "type": "TextSubheading",
-                  "text": "📍 Store Address for Pickup"
-                },
-                {
                   "type": "TextBody",
-                  "text": "No: 18, Mani Nagar, Sivanandapuram, Saravanampatti"
+                  "text": "📍 Store Address for Pickup:\nNo: 18, Mani Nagar, Sivanandapuram, Saravanampatti",
+                  "visible": false
                 },
                 {
                   "type": "Footer",
@@ -401,15 +234,8 @@
                       "name": "DISCOUNT_CODE"
                     },
                     "payload": {
-                      "name": "${data.name}",
-                      "email": "${data.email}",
-                      "mobile": "${data.mobile}",
+                      "customer": "${data.customer}",
                       "address": "${data.address}",
-                      "city": "${data.city}",
-                      "state": "${data.state}",
-                      "pincode": "${data.pincode}",
-                      "cart_summary": "${data.cart_summary}",
-                      "total_amount": "${data.total_amount}",
                       "delivery_type": "${form.delivery_type}"
                     }
                   }
@@ -424,41 +250,22 @@
         "title": "Discount Code",
         "terminal": false,
         "data": {
-          "name": {
-            "type": "string",
-            "__example__": "John Doe"
-          },
-          "email": {
-            "type": "string",
-            "__example__": "john.doe@email.com"
-          },
-          "mobile": {
-            "type": "string",
-            "__example__": "+91 9876543210"
+          "customer": {
+            "type": "object",
+            "__example__": {
+              "name": "John Doe",
+              "email": "john.doe@email.com",
+              "mobile": "+91 9876543210"
+            }
           },
           "address": {
-            "type": "string",
-            "__example__": "No 1, Anna Street, Ganapathy Taluk"
-          },
-          "city": {
-            "type": "string",
-            "__example__": "Coimbatore"
-          },
-          "state": {
-            "type": "string",
-            "__example__": "Tamil Nadu"
-          },
-          "pincode": {
-            "type": "string",
-            "__example__": "641006"
-          },
-          "cart_summary": {
-            "type": "string",
-            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
+            "type": "object",
+            "__example__": {
+              "line1": "No 1, Anna Street, Ganapathy Taluk",
+              "city": "Coimbatore",
+              "state": "TN",
+              "pincode": "641006"
+            }
           },
           "delivery_type": {
             "type": "string",
@@ -483,7 +290,7 @@
                 {
                   "type": "TextInput",
                   "name": "discount_code",
-                  "label": "Discount Code (Optional)",
+                  "label": "Discount Code",
                   "required": false,
                   "input-type": "text",
                   "helper-text": "Leave blank if you don't have a discount code"
@@ -498,18 +305,12 @@
                       "name": "REVIEW_DETAILS"
                     },
                     "payload": {
-                      "name": "${data.name}",
-                      "email": "${data.email}",
-                      "mobile": "${data.mobile}",
+                      "customer": "${data.customer}",
                       "address": "${data.address}",
-                      "city": "${data.city}",
-                      "state": "${data.state}",
-                      "pincode": "${data.pincode}",
-                      "cart_summary": "${data.cart_summary}",
-                      "total_amount": "${data.total_amount}",
-                      "delivery_type": "${data.delivery_type}",
-                      "discount_code": "${form.discount_code}",
-                      "order_id": "ORD-${data.mobile}"
+                      "delivery_type": "${!data.delivery_type || data.delivery_type === '' ? 'Not chosen' : (data.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address')}",
+                      "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
+                      "order_id": "ORD-${data.customer.mobile}",
+                      "total_amount": "800"
                     }
                   }
                 }
@@ -523,41 +324,22 @@
         "title": "Review Your Order",
         "terminal": false,
         "data": {
-          "name": {
-            "type": "string",
-            "__example__": "John Doe"
-          },
-          "email": {
-            "type": "string",
-            "__example__": "john.doe@email.com"
-          },
-          "mobile": {
-            "type": "string",
-            "__example__": "+91 9876543210"
+          "customer": {
+            "type": "object",
+            "__example__": {
+              "name": "John Doe",
+              "email": "john.doe@email.com",
+              "mobile": "+91 9876543210"
+            }
           },
           "address": {
-            "type": "string",
-            "__example__": "No 1, Anna Street, Ganapathy Taluk"
-          },
-          "city": {
-            "type": "string",
-            "__example__": "Coimbatore"
-          },
-          "state": {
-            "type": "string",
-            "__example__": "Tamil Nadu"
-          },
-          "pincode": {
-            "type": "string",
-            "__example__": "641006"
-          },
-          "cart_summary": {
-            "type": "string",
-            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
+            "type": "object",
+            "__example__": {
+              "line1": "No 1, Anna Street, Ganapathy Taluk",
+              "city": "Coimbatore",
+              "state": "TN",
+              "pincode": "641006"
+            }
           },
           "delivery_type": {
             "type": "string",
@@ -570,6 +352,10 @@
           "order_id": {
             "type": "string",
             "__example__": "ORD-123456"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           }
         },
         "layout": {
@@ -589,31 +375,47 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "🛒 Cart Summary"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "${data.cart_summary}"
-                },
-                {
-                  "type": "TextSubheading",
                   "text": "👤 Customer Information"
                 },
                 {
                   "type": "TextBody",
-                  "text": "Name: ${data.name}\nEmail: ${data.email}\nMobile: ${data.mobile}"
+                  "text": "${data.customer.name}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.customer.email}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.customer.mobile}"
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "📦 Delivery Information"
+                  "text": "📦 Delivery Address"
                 },
                 {
                   "type": "TextBody",
-                  "text": "Address: ${data.address}, ${data.city}, ${data.state} - ${data.pincode}"
+                  "text": "${data.address.line1}"
                 },
                 {
                   "type": "TextBody",
-                  "text": "Delivery Method: ${data.delivery_type == 'ship' ? '🚚 Ship to Address' : '🏪 Pickup from Store'}"
+                  "text": "${data.address.city}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.address.state}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.address.pincode}"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "📦 Delivery Method"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.delivery_type}"
                 },
                 {
                   "type": "TextSubheading",
@@ -621,15 +423,19 @@
                 },
                 {
                   "type": "TextBody",
-                  "text": "Order ID: ${data.order_id}"
+                  "text": "Total: ₹"
                 },
                 {
                   "type": "TextBody",
-                  "text": "Total Amount: ₹${data.total_amount}"
+                  "text": "${data.total_amount}"
                 },
                 {
-                  "type": "TextBody",
-                  "text": "Discount Code: ${data.discount_code ? data.discount_code : 'None applied'}"
+                    "type": "TextBody",
+                    "text": "Discount Code:"
+                },
+                {
+                    "type": "TextBody",
+                    "text": "${data.discount_code}"
                 },
                 {
                   "type": "Footer",
@@ -641,18 +447,12 @@
                       "name": "ORDER_CONFIRMATION"
                     },
                     "payload": {
-                      "name": "${data.name}",
-                      "email": "${data.email}",
-                      "mobile": "${data.mobile}",
+                      "customer": "${data.customer}",
                       "address": "${data.address}",
-                      "city": "${data.city}",
-                      "state": "${data.state}",
-                      "pincode": "${data.pincode}",
-                      "cart_summary": "${data.cart_summary}",
-                      "total_amount": "${data.total_amount}",
                       "delivery_type": "${data.delivery_type}",
                       "discount_code": "${data.discount_code}",
-                      "order_id": "${data.order_id}"
+                      "order_id": "${data.order_id}",
+                      "total_amount": "${data.total_amount}"
                     }
                   }
                 }
@@ -667,41 +467,22 @@
         "terminal": true,
         "success": true,
         "data": {
-          "name": {
-            "type": "string",
-            "__example__": "John Doe"
-          },
-          "email": {
-            "type": "string",
-            "__example__": "john.doe@email.com"
-          },
-          "mobile": {
-            "type": "string",
-            "__example__": "+91 9876543210"
+          "customer": {
+            "type": "object",
+            "__example__": {
+              "name": "John Doe",
+              "email": "john.doe@email.com",
+              "mobile": "+91 9876543210"
+            }
           },
           "address": {
-            "type": "string",
-            "__example__": "No 1, Anna Street, Ganapathy Taluk"
-          },
-          "city": {
-            "type": "string",
-            "__example__": "Coimbatore"
-          },
-          "state": {
-            "type": "string",
-            "__example__": "Tamil Nadu"
-          },
-          "pincode": {
-            "type": "string",
-            "__example__": "641006"
-          },
-          "cart_summary": {
-            "type": "string",
-            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
+            "type": "object",
+            "__example__": {
+              "line1": "No 1, Anna Street, Ganapathy Taluk",
+              "city": "Coimbatore",
+              "state": "TN",
+              "pincode": "641006"
+            }
           },
           "delivery_type": {
             "type": "string",
@@ -714,6 +495,10 @@
           "order_id": {
             "type": "string",
             "__example__": "ORD-123456"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           }
         },
         "layout": {
@@ -729,27 +514,15 @@
                 },
                 {
                   "type": "TextBody",
-                  "text": "Thank you ${data.name}! Your order has been successfully placed. Please proceed to payment to complete your purchase."
+                  "text": "Thank you! Your order has been successfully placed. Please proceed to payment to complete your purchase."
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "📋 Order Details"
+                  "text": "Total Amount:"
                 },
                 {
                   "type": "TextBody",
-                  "text": "Order ID: ${data.order_id}\nTotal Amount: ₹${data.total_amount}"
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "📦 Delivery Details"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "Address: ${data.address}, ${data.city}, ${data.state} - ${data.pincode}"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "Delivery Method: ${data.delivery_type == 'ship' ? '🚚 Ship to Address' : '🏪 Pickup from Store'}"
+                  "text": "${data.total_amount}"
                 },
                 {
                   "type": "TextBody",
