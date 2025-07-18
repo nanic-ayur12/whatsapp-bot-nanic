@@ -1,0 +1,568 @@
+{
+    "version": "7.1",
+    "screens": [
+      {
+        "id": "CHECKOUT",
+        "title": "Complete Your Order",
+        "terminal": false,
+        "data": {
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
+          },
+          "currency": {
+            "type": "string",
+            "__example__": "INR"
+          }
+        },
+        "layout": {
+          "type": "SingleColumnLayout",
+          "children": [
+            {
+              "type": "Form",
+              "name": "checkout_form",
+              "children": [
+                {
+                  "type": "TextHeading",
+                  "text": "🛒 Order Summary"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.cart_summary}"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "💰 Total Amount: ₹${data.total_amount}"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "📋 Your Information"
+                },
+                {
+                  "type": "TextInput",
+                  "name": "name",
+                  "label": "Full Name",
+                  "required": true,
+                  "input-type": "text"
+                },
+                {
+                  "type": "TextInput",
+                  "name": "email",
+                  "label": "Email Address",
+                  "required": true,
+                  "input-type": "email"
+                },
+                {
+                  "type": "TextInput",
+                  "name": "mobile",
+                  "label": "Mobile Number",
+                  "required": true,
+                  "input-type": "phone"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "📦 Shipping Address"
+                },
+                {
+                  "type": "TextInput",
+                  "name": "address",
+                  "label": "Address Line",
+                  "required": true,
+                  "input-type": "text",
+                  "helper-text": "e.g., No 1, Anna Street, Ganapathy Taluk"
+                },
+                {
+                  "type": "TextInput",
+                  "name": "city",
+                  "label": "City",
+                  "required": true,
+                  "input-type": "text"
+                },
+                {
+                  "type": "Dropdown",
+                  "name": "state",
+                  "label": "State",
+                  "required": true,
+                  "data-source": [
+                    { "id": "TN", "title": "Tamil Nadu" },
+                    { "id": "KA", "title": "Karnataka" },
+                    { "id": "AP", "title": "Andhra Pradesh" },
+                    { "id": "TS", "title": "Telangana" },
+                    { "id": "KL", "title": "Kerala" },
+                    { "id": "PY", "title": "Puducherry" },
+                    { "id": "MH", "title": "Maharashtra" },
+                    { "id": "GJ", "title": "Gujarat" },
+                    { "id": "RJ", "title": "Rajasthan" },
+                    { "id": "MP", "title": "Madhya Pradesh" },
+                    { "id": "UP", "title": "Uttar Pradesh" },
+                    { "id": "BR", "title": "Bihar" },
+                    { "id": "WB", "title": "West Bengal" },
+                    { "id": "OD", "title": "Odisha" },
+                    { "id": "JH", "title": "Jharkhand" },
+                    { "id": "CG", "title": "Chhattisgarh" },
+                    { "id": "HR", "title": "Haryana" },
+                    { "id": "PB", "title": "Punjab" },
+                    { "id": "HP", "title": "Himachal Pradesh" },
+                    { "id": "UT", "title": "Uttarakhand" },
+                    { "id": "DL", "title": "Delhi" },
+                    { "id": "AS", "title": "Assam" },
+                    { "id": "AR", "title": "Arunachal Pradesh" },
+                    { "id": "MN", "title": "Manipur" },
+                    { "id": "ML", "title": "Meghalaya" },
+                    { "id": "MZ", "title": "Mizoram" },
+                    { "id": "NL", "title": "Nagaland" },
+                    { "id": "SK", "title": "Sikkim" },
+                    { "id": "TR", "title": "Tripura" },
+                    { "id": "GA", "title": "Goa" },
+                    { "id": "AN", "title": "Andaman and Nicobar Islands" },
+                    { "id": "CH", "title": "Chandigarh" },
+                    { "id": "DN", "title": "Dadra and Nagar Haveli" },
+                    { "id": "DD", "title": "Daman and Diu" },
+                    { "id": "JK", "title": "Jammu and Kashmir" },
+                    { "id": "LA", "title": "Ladakh" },
+                    { "id": "LD", "title": "Lakshadweep" }
+                  ]
+                },
+                {
+                  "type": "TextInput",
+                  "name": "pincode",
+                  "label": "Pincode",
+                  "required": true,
+                  "input-type": "number"
+                },
+                {
+                  "type": "Footer",
+                  "label": "Continue",
+                  "on-click-action": {
+                    "name": "navigate",
+                    "next": {
+                      "type": "screen",
+                      "name": "DELIVERY_OPTIONS"
+                    },
+                    "payload": {
+                      "name": "${form.name}",
+                      "email": "${form.email}",
+                      "mobile": "${form.mobile}",
+                      "address": "${form.address}",
+                      "city": "${form.city}",
+                      "state": "${form.state}",
+                      "pincode": "${form.pincode}"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "DELIVERY_OPTIONS",
+        "title": "Delivery Options",
+        "terminal": false,
+        "data": {
+          "name": {
+            "type": "string",
+            "__example__": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "__example__": "john.doe@email.com"
+          },
+          "mobile": {
+            "type": "string",
+            "__example__": "+91 9876543210"
+          },
+          "address": {
+            "type": "string",
+            "__example__": "No 1, Anna Street, Ganapathy Taluk"
+          },
+          "city": {
+            "type": "string",
+            "__example__": "Coimbatore"
+          },
+          "state": {
+            "type": "string",
+            "__example__": "TN"
+          },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
+          }
+        },
+        "layout": {
+          "type": "SingleColumnLayout",
+          "children": [
+            {
+              "type": "Form",
+              "name": "delivery_form",
+              "children": [
+                {
+                  "type": "TextHeading",
+                  "text": "🚚 Choose Delivery Method"
+                },
+                {
+                  "type": "RadioButtonsGroup",
+                  "name": "delivery_type",
+                  "label": "Delivery Options",
+                  "required": true,
+                  "data-source": [
+                    {
+                      "id": "ship",
+                      "title": "🚚 Ship to Address",
+                      "description": "We'll deliver to your provided address"
+                    },
+                    {
+                      "id": "pickup",
+                      "title": "🏪 Pickup from Store",
+                      "description": "Collect from our store (No delivery charges)"
+                    }
+                  ]
+                },
+                {
+                  "type": "TextBody",
+                  "text": "📍 Store Address for Pickup:\nNo: 18, Mani Nagar, Sivanandapuram, Saravanampatti",
+                  "visible": false
+                },
+                {
+                  "type": "Footer",
+                  "label": "Continue",
+                  "on-click-action": {
+                    "name": "navigate",
+                    "next": {
+                      "type": "screen",
+                      "name": "DISCOUNT_CODE"
+                    },
+                    "payload": {
+                      "name": "${data.name}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
+                      "address": "${data.address}",
+                      "city": "${data.city}",
+                      "state": "${data.state}",
+                      "pincode": "${data.pincode}",
+                      "delivery_type": "${form.delivery_type}"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "DISCOUNT_CODE",
+        "title": "Discount Code",
+        "terminal": false,
+        "data": {
+          "name": {
+            "type": "string",
+            "__example__": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "__example__": "john.doe@email.com"
+          },
+          "mobile": {
+            "type": "string",
+            "__example__": "+91 9876543210"
+          },
+          "address": {
+            "type": "string",
+            "__example__": "No 1, Anna Street, Ganapathy Taluk"
+          },
+          "city": {
+            "type": "string",
+            "__example__": "Coimbatore"
+          },
+          "state": {
+            "type": "string",
+            "__example__": "TN"
+          },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
+          },
+          "delivery_type": {
+            "type": "string",
+            "__example__": "ship"
+          }
+        },
+        "layout": {
+          "type": "SingleColumnLayout",
+          "children": [
+            {
+              "type": "Form",
+              "name": "discount_form",
+              "children": [
+                {
+                  "type": "TextHeading",
+                  "text": "🎟️ Discount Code"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Have a discount code? Enter it below to apply savings to your order."
+                },
+                {
+                  "type": "TextInput",
+                  "name": "discount_code",
+                  "label": "Discount Code (Optional)",
+                  "required": false,
+                  "input-type": "text",
+                  "helper-text": "Leave blank if you don't have a discount code"
+                },
+                {
+                  "type": "Footer",
+                  "label": "Apply & Continue",
+                  "on-click-action": {
+                    "name": "navigate",
+                    "next": {
+                      "type": "screen",
+                      "name": "REVIEW_DETAILS"
+                    },
+                    "payload": {
+                      "name": "${data.name}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
+                      "address": "${data.address}",
+                      "city": "${data.city}",
+                      "state": "${data.state}",
+                      "pincode": "${data.pincode}",
+                      "delivery_type": "${data.delivery_type}",
+                      "discount_code": "${form.discount_code}",
+                      "order_id": "ORD-${data.mobile}",
+                      "total_amount": "800"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "REVIEW_DETAILS",
+        "title": "Review Your Order",
+        "terminal": false,
+        "data": {
+          "name": {
+            "type": "string",
+            "__example__": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "__example__": "john.doe@email.com"
+          },
+          "mobile": {
+            "type": "string",
+            "__example__": "+91 9876543210"
+          },
+          "address": {
+            "type": "string",
+            "__example__": "No 1, Anna Street, Ganapathy Taluk"
+          },
+          "city": {
+            "type": "string",
+            "__example__": "Coimbatore"
+          },
+          "state": {
+            "type": "string",
+            "__example__": "TN"
+          },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
+          },
+          "delivery_type": {
+            "type": "string",
+            "__example__": "ship"
+          },
+          "discount_code": {
+            "type": "string",
+            "__example__": "SAVE10"
+          },
+          "order_id": {
+            "type": "string",
+            "__example__": "ORD-123456"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
+          }
+        },
+        "layout": {
+          "type": "SingleColumnLayout",
+          "children": [
+            {
+              "type": "Form",
+              "name": "review_form",
+              "children": [
+                {
+                  "type": "TextHeading",
+                  "text": "📋 Review Your Order"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Please review all the details below before submitting your order."
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "👤 Customer Information"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Name: ${data.name}\nEmail: ${data.email}\nMobile: ${data.mobile}"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "📦 Delivery Information"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Address: ${data.address}, ${data.city}, ${data.state} - ${data.pincode}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Delivery Method: ${data.delivery_type == 'ship' ? '🚚 Ship to Address' : '🏪 Pickup from Store'}"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "💰 Order Summary"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Order ID: ${data.order_id}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Total Amount: ₹${data.total_amount}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Discount Code: ${data.discount_code ? data.discount_code : 'None applied'}",
+                  "visible": true
+                },
+                {
+                  "type": "Footer",
+                  "label": "Submit Order",
+                  "on-click-action": {
+                    "name": "navigate",
+                    "next": {
+                      "type": "screen",
+                      "name": "ORDER_CONFIRMATION"
+                    },
+                    "payload": {
+                      "name": "${data.name}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
+                      "address": "${data.address}",
+                      "city": "${data.city}",
+                      "state": "${data.state}",
+                      "pincode": "${data.pincode}",
+                      "delivery_type": "${data.delivery_type}",
+                      "discount_code": "${data.discount_code}",
+                      "order_id": "${data.order_id}",
+                      "total_amount": "${data.total_amount}"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "ORDER_CONFIRMATION",
+        "title": "Order Confirmed",
+        "terminal": true,
+        "success": true,
+        "data": {
+          "name": {
+            "type": "string",
+            "__example__": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "__example__": "john.doe@email.com"
+          },
+          "mobile": {
+            "type": "string",
+            "__example__": "+91 9876543210"
+          },
+          "address": {
+            "type": "string",
+            "__example__": "No 1, Anna Street, Ganapathy Taluk"
+          },
+          "city": {
+            "type": "string",
+            "__example__": "Coimbatore"
+          },
+          "state": {
+            "type": "string",
+            "__example__": "TN"
+          },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
+          },
+          "delivery_type": {
+            "type": "string",
+            "__example__": "ship"
+          },
+          "discount_code": {
+            "type": "string",
+            "__example__": "SAVE10"
+          },
+          "order_id": {
+            "type": "string",
+            "__example__": "ORD-123456"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
+          }
+        },
+        "layout": {
+          "type": "SingleColumnLayout",
+          "children": [
+            {
+              "type": "Form",
+              "name": "confirmation_form",
+              "children": [
+                {
+                  "type": "TextHeading",
+                  "text": "🎉 Order Placed Successfully!"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Thank you ${data.name}! Your order has been successfully placed. Please proceed to payment to complete your purchase."
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "Order ID: ${data.order_id}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Total Amount: ₹${data.total_amount}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "You will receive a confirmation email shortly with your order details and payment instructions."
+                },
+                {
+                  "type": "Footer",
+                  "label": "Close",
+                  "on-click-action": {
+                    "name": "complete"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }

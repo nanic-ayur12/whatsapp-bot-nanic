@@ -319,7 +319,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const data = JSON.parse(response_json);
     const session = sessions[phone] || {};
 
-    // Update session with flow data (supporting new fields)
+    // Update session with flow data
     session.name = data.name;
     session.email = data.email;
     session.mobile = data.mobile;
@@ -331,7 +331,6 @@ const handleFlowResponse = async (flowResponse, phone) => {
     };
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
-    session.pincode_validated = data.validated === 'true';
 
     // Delivery type logic
     let shipping = 0;
@@ -345,8 +344,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
         country: 'India'
       };
     } else {
-      const state = session.address.state?.toLowerCase().replace(/\s+/g, '');
-      shipping = ['tn', 'tamilnadu'].includes(state) ? 40 : 80;
+      shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
     }
     session.shipping = shipping;
 
@@ -392,7 +390,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     await sendInteractiveMessage(
       phone,
       '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
       confirmButtons
     );
   } catch (error) {
@@ -1299,25 +1297,6 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
   }
 
   res.sendStatus(400);
-});
-
-// Pincode validation endpoint for flow.json integration
-app.get('/api/pincode/:pincode', async (req, res) => {
-  const { pincode } = req.params;
-  try {
-    const response = await axios.get(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = response.data?.[0]?.PostOffice?.[0];
-    if (data) {
-      res.json({
-        city: data.District,
-        state: data.State
-      });
-    } else {
-      res.status(404).json({ error: 'Invalid pincode' });
-    }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch pincode details' });
-  }
 });
 
 // Graceful shutdown
