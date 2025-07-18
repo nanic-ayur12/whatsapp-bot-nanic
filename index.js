@@ -319,17 +319,18 @@ const handleFlowResponse = async (flowResponse, phone) => {
   try {
     const { flow_token, response_json } = flowResponse;
     const data = JSON.parse(response_json);
+    console.log('Flow response data:', JSON.stringify(data, null, 2)); // Debug log
     const session = sessions[phone] || {};
 
     // Update session with flow data (supporting new fields)
-    session.name = data.customer?.name;
-    session.email = data.customer?.email;
-    session.mobile = data.customer?.mobile;
+    session.name = data.customer?.name || '';
+    session.email = data.customer?.email || '';
+    session.mobile = data.customer?.mobile || '';
     session.address = {
-      line: data.address?.line1,
-      city: data.address?.city,
-      state: data.address?.state,
-      pincode: data.address?.pincode
+      line: data.address?.line1 || '',
+      city: data.address?.city || '',
+      state: data.address?.state || '',
+      pincode: data.address?.pincode || ''
     };
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
