@@ -557,9 +557,8 @@ app.post('/webhook', async (req, res) => {
         total_amount: total.toString(), // Convert to string
         currency: 'INR'
       };
-      console.log('Sending flow data:', flowData);
-      await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
       
+      await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
     } else {
       // Fallback to traditional method
       await sendMessage(from, summary + '\n🧾 Please enter your *Name*');

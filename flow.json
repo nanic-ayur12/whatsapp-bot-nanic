@@ -91,23 +91,32 @@
                   "type": "Footer",
                   "label": "Continue",
                   "on-click-action": {
-                    "name": "navigate",
-                    "next": {
-                      "type": "screen",
-                      "name": "PINCODE_VALIDATION"
-                    },
+                    "name": "data_exchange",
                     "payload": {
                       "name": "${form.name}",
                       "email": "${form.email}",
                       "mobile": "${form.mobile}",
                       "address": "${form.address}",
-                      "pincode": "${form.pincode}"
+                      "pincode": "${form.pincode}",
+                      "cart_summary": "${data.cart_summary}",
+                      "total_amount": "${data.total_amount}"
                     }
                   }
                 }
               ]
             }
           ]
+        },
+        "action": {
+          "name": "data_exchange",
+          "data_exchange": {
+            "method": "GET",
+            "url": "https://wpbot.nanic.in/api/pincode/${form.pincode}"
+          },
+          "next": {
+            "type": "screen",
+            "name": "PINCODE_VALIDATION"
+          }
         }
       },
       {
@@ -131,6 +140,10 @@
             "type": "string",
             "__example__": "No 1, Anna Street, Ganapathy Taluk"
           },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
+          },
           "city": {
             "type": "string",
             "__example__": "Coimbatore"
@@ -139,10 +152,13 @@
             "type": "string",
             "__example__": "Tamil Nadu"
           },
-  
-          "pincode": {
+          "cart_summary": {
             "type": "string",
-            "__example__": "641006"
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           }
         },
         "layout": {
@@ -216,7 +232,7 @@
                   "label": "State",
                   "required": false,
                   "data-source": [
-                    { "id": "Keep current state", "title": "Keep current state" },
+                    { "id": "keep_current", "title": "Keep current state" },
                     { "id": "Tamil Nadu", "title": "Tamil Nadu" },
                     { "id": "Karnataka", "title": "Karnataka" },
                     { "id": "Andhra Pradesh", "title": "Andhra Pradesh" },
@@ -254,15 +270,7 @@
                     { "id": "Jammu and Kashmir", "title": "Jammu and Kashmir" },
                     { "id": "Ladakh", "title": "Ladakh" },
                     { "id": "Lakshadweep", "title": "Lakshadweep" }
-                    ]
-                },
-                {
-                  "type": "TextBody",
-                  "text": "💡 Additional Information"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "💡 API Integration: The details above were fetched from PostOffice API (https://api.postalpincode.in/pincode/${data.pincode}). If they're incorrect, please use the edit fields above."
+                  ]
                 },
                 {
                   "type": "Footer",
@@ -281,6 +289,8 @@
                       "city": "${form.city_edit ? form.city_edit : data.city}",
                       "state": "${form.state_edit == 'keep_current' ? data.state : (form.state_edit ? form.state_edit : data.state)}",
                       "pincode": "${data.pincode}",
+                      "cart_summary": "${data.cart_summary}",
+                      "total_amount": "${data.total_amount}",
                       "validated": "true"
                     }
                   }
@@ -317,11 +327,19 @@
           },
           "state": {
             "type": "string",
-            "__example__": "TN"
+            "__example__": "Tamil Nadu"
           },
           "pincode": {
             "type": "string",
             "__example__": "641006"
+          },
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           },
           "validated": {
             "type": "string",
@@ -338,6 +356,14 @@
                 {
                   "type": "TextHeading",
                   "text": "🚚 Choose Delivery Method"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "📍 Delivery Address"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.name}\n${data.address}\n${data.city}, ${data.state} - ${data.pincode}\nMobile: ${data.mobile}"
                 },
                 {
                   "type": "RadioButtonsGroup",
@@ -358,9 +384,12 @@
                   ]
                 },
                 {
+                  "type": "TextSubheading",
+                  "text": "📍 Store Address for Pickup"
+                },
+                {
                   "type": "TextBody",
-                  "text": "📍 Store Address for Pickup:\nNo: 18, Mani Nagar, Sivanandapuram, Saravanampatti",
-                  "visible": false
+                  "text": "No: 18, Mani Nagar, Sivanandapuram, Saravanampatti"
                 },
                 {
                   "type": "Footer",
@@ -379,6 +408,8 @@
                       "city": "${data.city}",
                       "state": "${data.state}",
                       "pincode": "${data.pincode}",
+                      "cart_summary": "${data.cart_summary}",
+                      "total_amount": "${data.total_amount}",
                       "delivery_type": "${form.delivery_type}"
                     }
                   }
@@ -415,11 +446,19 @@
           },
           "state": {
             "type": "string",
-            "__example__": "TN"
+            "__example__": "Tamil Nadu"
           },
           "pincode": {
             "type": "string",
             "__example__": "641006"
+          },
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           },
           "delivery_type": {
             "type": "string",
@@ -466,10 +505,11 @@
                       "city": "${data.city}",
                       "state": "${data.state}",
                       "pincode": "${data.pincode}",
+                      "cart_summary": "${data.cart_summary}",
+                      "total_amount": "${data.total_amount}",
                       "delivery_type": "${data.delivery_type}",
                       "discount_code": "${form.discount_code}",
-                      "order_id": "ORD-${data.mobile}",
-                      "total_amount": "800"
+                      "order_id": "ORD-${data.mobile}"
                     }
                   }
                 }
@@ -505,11 +545,19 @@
           },
           "state": {
             "type": "string",
-            "__example__": "TN"
+            "__example__": "Tamil Nadu"
           },
           "pincode": {
             "type": "string",
             "__example__": "641006"
+          },
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           },
           "delivery_type": {
             "type": "string",
@@ -522,10 +570,6 @@
           "order_id": {
             "type": "string",
             "__example__": "ORD-123456"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
           }
         },
         "layout": {
@@ -542,6 +586,14 @@
                 {
                   "type": "TextBody",
                   "text": "Please review all the details below before submitting your order."
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "🛒 Cart Summary"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "${data.cart_summary}"
                 },
                 {
                   "type": "TextSubheading",
@@ -577,8 +629,7 @@
                 },
                 {
                   "type": "TextBody",
-                  "text": "Discount Code: ${data.discount_code ? data.discount_code : 'None applied'}",
-                  "visible": true
+                  "text": "Discount Code: ${data.discount_code ? data.discount_code : 'None applied'}"
                 },
                 {
                   "type": "Footer",
@@ -597,10 +648,11 @@
                       "city": "${data.city}",
                       "state": "${data.state}",
                       "pincode": "${data.pincode}",
+                      "cart_summary": "${data.cart_summary}",
+                      "total_amount": "${data.total_amount}",
                       "delivery_type": "${data.delivery_type}",
                       "discount_code": "${data.discount_code}",
-                      "order_id": "${data.order_id}",
-                      "total_amount": "${data.total_amount}"
+                      "order_id": "${data.order_id}"
                     }
                   }
                 }
@@ -637,11 +689,19 @@
           },
           "state": {
             "type": "string",
-            "__example__": "TN"
+            "__example__": "Tamil Nadu"
           },
           "pincode": {
             "type": "string",
             "__example__": "641006"
+          },
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           },
           "delivery_type": {
             "type": "string",
@@ -654,10 +714,6 @@
           "order_id": {
             "type": "string",
             "__example__": "ORD-123456"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
           }
         },
         "layout": {
@@ -677,11 +733,23 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "Order ID: ${data.order_id}"
+                  "text": "📋 Order Details"
                 },
                 {
                   "type": "TextBody",
-                  "text": "Total Amount: ₹${data.total_amount}"
+                  "text": "Order ID: ${data.order_id}\nTotal Amount: ₹${data.total_amount}"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "📦 Delivery Details"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Address: ${data.address}, ${data.city}, ${data.state} - ${data.pincode}"
+                },
+                {
+                  "type": "TextBody",
+                  "text": "Delivery Method: ${data.delivery_type == 'ship' ? '🚚 Ship to Address' : '🏪 Pickup from Store'}"
                 },
                 {
                   "type": "TextBody",
