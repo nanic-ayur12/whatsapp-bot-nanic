@@ -245,7 +245,7 @@ async function sendWelcomeMessage(phone) {
   const buttons = [
     {
       type: 'catalog',
-      catalog_id: WHATSAPP_CATALOG_ID,
+      catalog_id: process.env.WHATSAPP_CATALOG_ID,
       title: '🛍️ View Catalog'
     },
     {
