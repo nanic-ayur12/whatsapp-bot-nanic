@@ -188,18 +188,7 @@ const sendFlowMessage = async (phone, flowId, flowData = {}) => {
 const sendInteractiveMessage = async (phone, headerText, bodyText, buttons) => {
   updateActivity();
   
-  // Support for catalog buttons
-  const formattedButtons = buttons.map(btn => {
-    if (btn.type === 'catalog') {
-      return {
-        type: 'catalog',
-        catalog_id: btn.catalog_id,
-        title: btn.title
-      };
-    }
-    return btn;
-  });
-
+  // No need to format catalog buttons, just use buttons as is
   const message = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -218,7 +207,7 @@ const sendInteractiveMessage = async (phone, headerText, bodyText, buttons) => {
         text: 'Nanic Ayurveda'
       },
       action: {
-        buttons: formattedButtons
+        buttons: buttons
       }
     }
   };
@@ -244,8 +233,8 @@ async function sendWelcomeMessage(phone) {
   
   const buttons = [
     {
-      type: 'catalog',
-      catalog_id: process.env.WHATSAPP_CATALOG_ID,
+      type: 'url',
+      url: 'https://wa.me/c/919682564373', // WhatsApp catalog link
       title: '🛍️ View Catalog'
     },
     {
