@@ -327,10 +327,10 @@ const handleFlowResponse = async (flowResponse, phone) => {
     session.email = data.customer?.email || '';
     session.mobile = data.customer?.mobile || '';
     session.address = {
-      line: data.address?.line1 || '',
-      city: data.address?.city || '',
-      state: data.address?.state || '',
-      pincode: data.address?.pincode || ''
+      line: data.address_line1 || '',
+      city: data.address_city || '',
+      state: data.address_state || '',
+      pincode: data.address_pincode || ''
     };
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';

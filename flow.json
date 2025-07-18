@@ -390,7 +390,16 @@
                   "type": "Footer",
                   "label": "Close",
                   "on-click-action": {
-                    "name": "complete"
+                    "name": "complete",
+                    "payload": {
+                      "customer": "${data.customer}",
+                      "address_line1": "${data.address.line1}",
+                      "address_city": "${data.address.city}",
+                      "address_state": "${data.address.state}",
+                      "address_pincode": "${data.address.pincode}",
+                      "delivery_type": "${data.delivery_type}",
+                      "discount_code": "${data.discount_code}"
+                    }
                   }
                 }
               ]
