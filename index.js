@@ -114,7 +114,8 @@ const productDetails = {
   '41386853990446': { name: 'Aloe Vera Hair Cleanser', price: 245 },
   '41392567255086': { name: 'Traditional Kajal', price: 225 },
   '41374936727598': { name: 'Traditional Kumkum', price: 199 },
-  '41422183333934': { name: 'Bhringaraj Hair Cleanser', price: 216 }
+  '41422183333934': { name: 'Bhringaraj Hair Cleanser', price: 216 },
+  '41462328623150': { name: 'Test Product Not For Sale', price: 1 }
 };
 
 app.get("/webhook", (req, res) => {
