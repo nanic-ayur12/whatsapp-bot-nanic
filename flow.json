@@ -138,7 +138,11 @@
                   "type": "Footer",
                   "label": "Continue",
                   "on-click-action": {
-                    "name": "complete",
+                    "name": "navigate",
+                    "next": {
+                      "type": "screen",
+                      "name": "DELIVERY_OPTIONS"
+                    },
                     "payload": {
                       "name": "${form.name}",
                       "email": "${form.email}",
@@ -147,7 +151,9 @@
                       "city": "${form.city}",
                       "state": "${form.state}",
                       "pincode": "${form.pincode}",
-                      "total_amount": "${data.total_amount}"
+                      "total_amount": "${data.total_amount}",
+                      "cart_summary": "${data.cart_summary}",
+                      "currency": "${data.currency}"
                     }
                   }
                 }
@@ -192,6 +198,14 @@
           "total_amount": {
             "type": "string",
             "__example__": "800"
+          },
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "currency": {
+            "type": "string",
+            "__example__": "INR"
           }
         },
         "layout": {
@@ -226,7 +240,7 @@
                 {
                   "type": "TextBody",
                   "text": "📍 Store Address for Pickup:\nNo: 18, Mani Nagar, Sivanandapuram, Saravanampatti",
-                  "visible": false
+                  "visible": "${form.delivery_type == 'pickup'}"
                 },
                 {
                   "type": "Footer",
@@ -246,7 +260,9 @@
                       "state": "${data.state}",
                       "pincode": "${data.pincode}",
                       "delivery_type": "${form.delivery_type}",
-                      "total_amount": "${data.total_amount}"
+                      "total_amount": "${data.total_amount}",
+                      "cart_summary": "${data.cart_summary}",
+                      "currency": "${data.currency}"
                     }
                   }
                 }
@@ -296,6 +312,14 @@
           "total_amount": {
             "type": "string",
             "__example__": "800"
+          },
+          "cart_summary": {
+            "type": "string",
+            "__example__": "Cart Summary:\n- Product 1 x 2 = ₹500\n- Product 2 x 1 = ₹300"
+          },
+          "currency": {
+            "type": "string",
+            "__example__": "INR"
           }
         },
         "layout": {
@@ -323,7 +347,7 @@
                 },
                 {
                   "type": "Footer",
-                  "label": "Apply & Continue",
+                  "label": "Complete Order",
                   "on-click-action": {
                     "name": "complete",
                     "payload": {
@@ -336,7 +360,9 @@
                       "pincode": "${data.pincode}",
                       "delivery_type": "${data.delivery_type}",
                       "discount_code": "${form.discount_code}",
-                      "total_amount": "${data.total_amount}"
+                      "total_amount": "${data.total_amount}",
+                      "cart_summary": "${data.cart_summary}",
+                      "currency": "${data.currency}"
                     }
                   }
                 }
