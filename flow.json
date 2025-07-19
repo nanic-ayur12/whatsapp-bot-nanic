@@ -138,11 +138,7 @@
                   "type": "Footer",
                   "label": "Continue",
                   "on-click-action": {
-                    "name": "navigate",
-                    "next": {
-                      "type": "screen",
-                      "name": "DELIVERY_OPTIONS"
-                    },
+                    "name": "complete",
                     "payload": {
                       "name": "${form.name}",
                       "email": "${form.email}",
@@ -262,7 +258,8 @@
       {
         "id": "DISCOUNT_CODE",
         "title": "Discount Code",
-        "terminal": false,
+        "terminal": true,
+        "success": true,
         "data": {
           "name": {
             "type": "string",

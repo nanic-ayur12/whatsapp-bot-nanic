@@ -322,34 +322,16 @@ const handleFlowResponse = async (flowResponse, phone) => {
     console.log('Flow response data:', JSON.stringify(data, null, 2)); // Debug log
     const session = sessions[phone] || {};
 
-    // Update session with flow data - handle both nested and flat structures
-    if (data.customer && Object.keys(data.customer).length > 0) {
-      session.name = data.customer.name || '';
-      session.email = data.customer.email || '';
-      session.mobile = data.customer.mobile || '';
-    } else {
-      // Fallback to flat structure
-      session.name = data.name || '';
-      session.email = data.email || '';
-      session.mobile = data.mobile || '';
-    }
-
-    if (data.address && Object.keys(data.address).length > 0) {
-      session.address = {
-        line: data.address.line1 || '',
-        city: data.address.city || '',
-        state: data.address.state || '',
-        pincode: data.address.pincode || ''
-      };
-    } else {
-      // Fallback to flat structure
-      session.address = {
-        line: data.address_line1 || data.address || '',
-        city: data.city || '',
-        state: data.state || '',
-        pincode: data.pincode || ''
-      };
-    }
+    // Update session with flow data
+    session.name = data.name || '';
+    session.email = data.email || '';
+    session.mobile = data.mobile || '';
+    session.address = {
+      line: data.address || '',
+      city: data.city || '',
+      state: data.state || '',
+      pincode: data.pincode || ''
+    };
 
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
@@ -375,7 +357,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     let discountAmount = 0;
     let discountMsg = '';
     if (session.discount_code) {
-      const discountRes = await validateDiscountCode(session.discount_code, session.totalWithShipping);
+      const discountRes = await validateDiscountCode(session.discount_code, session.total + shipping);
       if (discountRes.valid) {
         discountAmount = discountRes.amount;
         session.discount_value = discountAmount;
