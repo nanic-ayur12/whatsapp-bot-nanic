@@ -364,7 +364,33 @@ const handleFlowResponse = async (flowResponse, phone) => {
         discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
       } else {
         session.discount_value = 0;
-        discountMsg = `\n❌ Discount code invalid or expired.`;
+        // Offer retry/skip options and return early
+        const retryButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'retry_discount',
+              title: '🔄 Try Another Code'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'skip_discount',
+              title: '⏭️ Skip Discount'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          phone,
+          '❌ Invalid Discount Code',
+          `Sorry, the discount code "${session.discount_code}" is invalid or expired.\n\nWould you like to try another discount code?`,
+          retryButtons
+        );
+        session.step = 'discount_retry';
+        sessions[phone] = session;
+        return; // Stop further processing
       }
     } else {
       session.discount_value = 0;
