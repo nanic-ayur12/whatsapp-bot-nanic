@@ -149,15 +149,15 @@
                     },
                     "payload": {
                       "customer": {
-                        "name": "${form.customer.name}",
-                        "email": "${form.customer.email}",
-                        "mobile": "${form.customer.mobile}"
+                        "name": "${form.customer\\.name}",
+                        "email": "${form.customer\\.email}",
+                        "mobile": "${form.customer\\.mobile}"
                       },
                       "address": {
-                        "line1": "${form.address.line1}",
-                        "city": "${form.address.city}",
-                        "state": "${form.address.state}",
-                        "pincode": "${form.address.pincode}"
+                        "line1": "${form.address\\.line1}",
+                        "city": "${form.address\\.city}",
+                        "state": "${form.address\\.state}",
+                        "pincode": "${form.address\\.pincode}"
                       }
                     }
                   }
@@ -235,15 +235,15 @@
                     },
                     "payload": {
                       "customer": {
-                        "name": "${data.customer.name}",
-                        "email": "${data.customer.email}",
-                        "mobile": "${data.customer.mobile}"
+                        "name": "${data.customer\\.name}",
+                        "email": "${data.customer\\.email}",
+                        "mobile": "${data.customer\\.mobile}"
                       },
                       "address": {
-                        "line1": "${data.address.line1}",
-                        "city": "${data.address.city}",
-                        "state": "${data.address.state}",
-                        "pincode": "${data.address.pincode}"
+                        "line1": "${data.address\\.line1}",
+                        "city": "${data.address\\.city}",
+                        "state": "${data.address\\.state}",
+                        "pincode": "${data.address\\.pincode}"
                       },
                       "delivery_type": "${form.delivery_type}"
                     }
@@ -394,11 +394,11 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "Total Amount:"
+                  "text": "💰 Total Amount:"
                 },
                 {
-                  "type": "TextBody",
-                  "text": "${data.total_amount}"
+                  "type": "TextSubheading",
+                  "text": "₹${data.total_amount}"
                 },
                 {
                   "type": "TextBody",
@@ -411,19 +411,19 @@
                     "name": "complete",
                     "payload": {
                       "customer": {
-                        "name": "${data.customer.name}",
-                        "email": "${data.customer.email}",
-                        "mobile": "${data.customer.mobile}"
+                        "name": "${data.customer\\.name}",
+                        "email": "${data.customer\\.email}",
+                        "mobile": "${data.customer\\.mobile}"
                       },
                       "address": {
-                        "line1": "${data.address.line1}",
-                        "city": "${data.address.city}",
-                        "state": "${data.address.state}",
-                        "pincode": "${data.address.pincode}"
+                        "line1": "${data.address\\.line1}",
+                        "city": "${data.address\\.city}",
+                        "state": "${data.address\\.state}",
+                        "pincode": "${data.address\\.pincode}"
                       },
                       "delivery_type": "${data.delivery_type}",
-                      "discount_code": "${data.discount_code}",
-                      "order_id": "${data.order_id}",
+                      "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
+                      "order_id": "ORD-${data.customer\\.mobile}",
                       "total_amount": "${data.total_amount}"
                     }
                   }

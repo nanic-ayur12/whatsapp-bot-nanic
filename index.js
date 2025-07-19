@@ -322,20 +322,44 @@ const handleFlowResponse = async (flowResponse, phone) => {
     console.log('Flow response data:', JSON.stringify(data, null, 2)); // Debug log
     const session = sessions[phone] || {};
 
-    // Update session with flow data (supporting new fields)
-    session.name = data.customer?.name || '';
-    session.email = data.customer?.email || '';
-    session.mobile = data.customer?.mobile || '';
-    session.address = {
-      line: data.address?.line1 || '',
-      city: data.address?.city || '',
-      state: data.address?.state || '',
-      pincode: data.address?.pincode || ''
-    };
+    // Update session with flow data - handle both nested and flat structures
+    if (data.customer && Object.keys(data.customer).length > 0) {
+      session.name = data.customer.name || '';
+      session.email = data.customer.email || '';
+      session.mobile = data.customer.mobile || '';
+    } else {
+      // Fallback to flat structure
+      session.name = data.name || '';
+      session.email = data.email || '';
+      session.mobile = data.mobile || '';
+    }
+
+    if (data.address && Object.keys(data.address).length > 0) {
+      session.address = {
+        line: data.address.line1 || '',
+        city: data.address.city || '',
+        state: data.address.state || '',
+        pincode: data.address.pincode || ''
+      };
+    } else {
+      // Fallback to flat structure
+      session.address = {
+        line: data.address_line1 || data.address || '',
+        city: data.city || '',
+        state: data.state || '',
+        pincode: data.pincode || ''
+      };
+    }
+
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
-    session.order_id = data.order_id || '';
-    session.totalWithShipping = parseInt(data.total_amount) || 0;
+    
+    // Generate order ID if not provided or if it's still a template
+    if (!data.order_id || data.order_id.includes('${')) {
+      session.order_id = `ORD-${session.mobile || Date.now()}`;
+    } else {
+      session.order_id = data.order_id;
+    }
 
     // Delivery type logic
     let shipping = 0;
