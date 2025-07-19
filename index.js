@@ -680,14 +680,14 @@ app.post('/webhook', async (req, res) => {
                 type: 'reply',
                 reply: {
                   id: 'retry_discount',
-                  title: '✅ Yes, Try Again'
+                   title: '🔄 Try Another Code'
                 }
               },
               {
                 type: 'reply',
                 reply: {
                   id: 'skip_discount',
-                  title: '❌ No, Skip Discount'
+                   title: '⏭️ Skip Discount'
                 }
               }
             ];
@@ -698,10 +698,16 @@ app.post('/webhook', async (req, res) => {
               `Sorry, the discount code "${discountCode}" is invalid or expired.\n\nWould you like to try another discount code?`,
               retryButtons
             );
+            session.step = 'discount_retry';
+            sessions[from] = session;
           }
         } else {
           await sendMessage(from, '❓ Please enter a valid discount code or type "skip" to continue without discount.');
         }
+        break;
+
+      case 'discount_retry':
+        // This case is handled by button responses below
         break;
 
       case 'name':
@@ -969,6 +975,40 @@ app.post('/webhook', async (req, res) => {
       session.step = 'address_line';
       await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
       sessions[from] = session;
+    } else if (buttonId === 'retry_discount') {
+      session.step = 'discount_input';
+      await sendMessage(from, '🎟️ Please enter your discount code:');
+      sessions[from] = session;
+    } else if (buttonId === 'skip_discount') {
+      // Skip discount and proceed to payment
+      session.discount_code = '';
+      session.discount_value = 0;
+      session.totalWithShipping = session.total + session.shipping;
+      sessions[from] = session;
+
+      const confirmButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'confirm_payment',
+            title: '💳 Proceed to Payment'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'cancel_order',
+            title: '❌ Cancel Order'
+          }
+        }
+      ];
+
+      await sendInteractiveMessage(
+        from,
+        '✅ Order Summary',
+        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+        confirmButtons
+      );
     }
   }
 

@@ -36,11 +36,7 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "💰 Total Amount: ₹"
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "${data.total_amount}"
+                  "text": "💰 Total Amount: ₹${data.total_amount}"
                 },
                 {
                   "type": "TextSubheading",
