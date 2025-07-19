@@ -641,6 +641,70 @@ app.post('/webhook', async (req, res) => {
 
     // Handle traditional checkout flow (fallback when flows are not available)
     switch (session.step) {
+      case 'discount_input':
+        const discountCode = text.trim();
+        if (discountCode) {
+          const discountRes = await validateDiscountCode(discountCode, session.total);
+          if (discountRes.valid) {
+            session.discount_code = discountCode;
+            session.discount_value = discountRes.amount;
+            session.totalWithShipping = session.total + session.shipping - discountRes.amount;
+            if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+            sessions[from] = session;
+
+            const confirmButtons = [
+              {
+                type: 'reply',
+                reply: {
+                  id: 'confirm_payment',
+                  title: '💳 Proceed to Payment'
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: 'cancel_order',
+                  title: '❌ Cancel Order'
+                }
+              }
+            ];
+
+            await sendInteractiveMessage(
+              from,
+              '✅ Discount Applied Successfully!',
+              `🎉 Great! Your discount code "${discountCode}" has been applied!\n\nOrder Summary:\n📦 Items Total: ₹${session.total}\n🎟️ Discount Applied: -₹${discountRes.amount} (${discountCode})\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+              confirmButtons
+            );
+          } else {
+            const retryButtons = [
+              {
+                type: 'reply',
+                reply: {
+                  id: 'retry_discount',
+                  title: '✅ Yes, Try Again'
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: 'skip_discount',
+                  title: '❌ No, Skip Discount'
+                }
+              }
+            ];
+
+            await sendInteractiveMessage(
+              from,
+              '❌ Invalid Discount Code',
+              `Sorry, the discount code "${discountCode}" is invalid or expired.\n\nWould you like to try another discount code?`,
+              retryButtons
+            );
+          }
+        } else {
+          await sendMessage(from, '❓ Please enter a valid discount code or type "skip" to continue without discount.');
+        }
+        break;
+
       case 'name':
         session.name = text;
         session.step = 'email';
