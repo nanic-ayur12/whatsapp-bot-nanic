@@ -323,14 +323,14 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const session = sessions[phone] || {};
 
     // Update session with flow data (supporting new fields)
-    session.name = data.customer || '';
-    session.email = data.email || '';
-    session.mobile = data.mobile || '';
+    session.name = data.customer?.name || '';
+    session.email = data.customer?.email || '';
+    session.mobile = data.customer?.mobile || '';
     session.address = {
-      line: data.address_line1 || '',
-      city: data.address_city || '',
-      state: data.address_state || '',
-      pincode: data.address_pincode || ''
+      line: data.address?.line1 || '',
+      city: data.address?.city || '',
+      state: data.address?.state || '',
+      pincode: data.address?.pincode || ''
     };
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
@@ -371,7 +371,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
       session.discount_value = 0;
     }
 
-    session.totalWithShipping = session.totalWithShipping + shipping - discountAmount;
+    session.totalWithShipping = session.total + shipping - discountAmount;
     if (session.totalWithShipping < 0) session.totalWithShipping = 0;
     sessions[phone] = session;
 
@@ -396,7 +396,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     await sendInteractiveMessage(
       phone,
       '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.totalWithShipping}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
       confirmButtons
     );
   } catch (error) {
