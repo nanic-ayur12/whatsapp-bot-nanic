@@ -240,7 +240,7 @@
                 {
                   "type": "TextBody",
                   "text": "📍 Store Address for Pickup:\nNo: 18, Mani Nagar, Sivanandapuram, Saravanampatti",
-                  "visible": "${form.delivery_type == 'pickup'}"
+                  "visible": false
                 },
                 {
                   "type": "Footer",
