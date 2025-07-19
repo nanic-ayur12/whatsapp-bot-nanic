@@ -148,13 +148,17 @@
                       "name": "DELIVERY_OPTIONS"
                     },
                     "payload": {
-                      "customer": "${form.customer.name}",
-                      "email": "${form.customer.email}",
-                      "mobile": "${form.customer.mobile}",
-                      "address_line1": "${form.address.line1}",
-                      "address_city": "${form.address.city}",
-                      "address_state": "${form.address.state}",
-                      "address_pincode": "${form.address.pincode}"
+                      "customer": {
+                        "name": "${form.customer.name}",
+                        "email": "${form.customer.email}",
+                        "mobile": "${form.customer.mobile}"
+                      },
+                      "address": {
+                        "line1": "${form.address.line1}",
+                        "city": "${form.address.city}",
+                        "state": "${form.address.state}",
+                        "pincode": "${form.address.pincode}"
+                      }
                     }
                   }
                 }
@@ -230,13 +234,17 @@
                       "name": "DISCOUNT_CODE"
                     },
                     "payload": {
-                      "customer": "${data.customer}",
-                      "email": "${data.email}",
-                      "mobile": "${data.mobile}",
-                      "address_line1": "${data.address_line1}",
-                      "address_city": "${data.address_city}",
-                      "address_state": "${data.address_state}",
-                      "address_pincode": "${data.address_pincode}",
+                      "customer": {
+                        "name": "${data.customer.name}",
+                        "email": "${data.customer.email}",
+                        "mobile": "${data.customer.mobile}"
+                      },
+                      "address": {
+                        "line1": "${data.address.line1}",
+                        "city": "${data.address.city}",
+                        "state": "${data.address.state}",
+                        "pincode": "${data.address.pincode}"
+                      },
                       "delivery_type": "${form.delivery_type}"
                     }
                   }
@@ -306,13 +314,17 @@
                       "name": "ORDER_CONFIRMATION"
                     },
                     "payload": {
-                      "customer": "${form.customer.name}",
-                      "email": "${form.customer.email}",
-                      "mobile": "${form.customer.mobile}",
-                      "address_line1": "${form.address.line1}",
-                      "address_city": "${form.address.city}",
-                      "address_state": "${form.address.state}",
-                      "address_pincode": "${form.address.pincode}",
+                      "customer": {
+                        "name": "${form.customer.name}",
+                        "email": "${form.customer.email}",
+                        "mobile": "${form.customer.mobile}"
+                      },
+                      "address": {
+                        "line1": "${form.address.line1}",
+                        "city": "${form.address.city}",
+                        "state": "${form.address.state}",
+                        "pincode": "${form.address.pincode}"
+                      },
                       "delivery_type": "${form.delivery_type}",
                       "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
                       "order_id": "ORD-${form.customer.mobile}",
@@ -398,13 +410,17 @@
                   "on-click-action": {
                     "name": "complete",
                     "payload": {
-                      "customer": "${data.customer}",
-                      "email": "${data.email}",
-                      "mobile": "${data.mobile}",
-                      "address_line1": "${data.address_line1}",
-                      "address_city": "${data.address_city}",
-                      "address_state": "${data.address_state}",
-                      "address_pincode": "${data.address_pincode}",
+                      "customer": {
+                        "name": "${data.customer.name}",
+                        "email": "${data.customer.email}",
+                        "mobile": "${data.customer.mobile}"
+                      },
+                      "address": {
+                        "line1": "${data.address.line1}",
+                        "city": "${data.address.city}",
+                        "state": "${data.address.state}",
+                        "pincode": "${data.address.pincode}"
+                      },
                       "delivery_type": "${data.delivery_type}",
                       "discount_code": "${data.discount_code}",
                       "order_id": "${data.order_id}",
