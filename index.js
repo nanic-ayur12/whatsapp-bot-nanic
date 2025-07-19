@@ -441,10 +441,10 @@ app.post('/webhook', async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Handle interactive button responses
+  // Handle interactive button responses (ALL BUTTONS HANDLED HERE)
   if (type === 'interactive' && msg.interactive?.type === 'button_reply') {
     const buttonId = msg.interactive.button_reply.id;
-    
+    let handled = false;
     switch (buttonId) {
       case 'catalog':
         if (session.lastOrder && session.lastOrder.status === 'Not fulfilled yet') {
@@ -453,90 +453,188 @@ app.post('/webhook', async (req, res) => {
         } else {
           await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
         }
+        handled = true;
         break;
-        
       case 'track':
         session.step = 'track_order';
         await sendMessage(from, 'Please enter your *Order ID* to track your order.');
         sessions[from] = session;
+        handled = true;
         break;
-        
-        case 'confirm_payment':
-          session.step = 'payment';
-          
-          // Add validation before creating payment link
-          if (!session.totalWithShipping || !session.name || !session.email || !session.mobile) {
-            console.error('Missing required session data:', {
-              totalWithShipping: session.totalWithShipping,
+      case 'confirm_payment':
+        session.step = 'payment';
+        // Add validation before creating payment link
+        if (!session.totalWithShipping || !session.name || !session.email || !session.mobile) {
+          console.error('Missing required session data:', {
+            totalWithShipping: session.totalWithShipping,
+            name: session.name,
+            email: session.email,
+            mobile: session.mobile
+          });
+          await sendMessage(from, '❌ Missing order information. Please start over by typing "Hi".');
+          handled = true;
+          break;
+        }
+        try {
+          console.log('Creating Razorpay payment link with data:', {
+            amount: session.totalWithShipping * 100,
+            currency: 'INR',
+            description: `Order for ${session.name}`,
+            customer: {
               name: session.name,
               email: session.email,
-              mobile: session.mobile
-            });
-            await sendMessage(from, '❌ Missing order information. Please start over by typing "Hi".');
-            break;
-          }
-        
-          try {
-            console.log('Creating Razorpay payment link with data:', {
-              amount: session.totalWithShipping * 100,
-              currency: 'INR',
-              description: `Order for ${session.name}`,
-              customer: {
-                name: session.name,
-                email: session.email,
-                contact: session.mobile,
-              }
-            });
-        
-            const razorRes = await razorpay.paymentLink.create({
-              amount: session.totalWithShipping * 100,
-              currency: 'INR',
-              description: `Order for ${session.name}`,
-              customer: {
-                name: session.name,
-                email: session.email,
-                contact: session.mobile,
-              },
-              notify: { sms: false, email: false },
-              callback_url: "https://wpbot.nanic.in/razorpay-webhook",
-              callback_method: "get",
-              options: {
-                checkout: {
-                  name: "Nanic Ayurveda",
-                  description: "Ayurvedic Products",
-                  prefill: {
-                    name: session.name,
-                    email: session.email,
-                    contact: session.mobile
-                  }
+              contact: session.mobile,
+            }
+          });
+          const razorRes = await razorpay.paymentLink.create({
+            amount: session.totalWithShipping * 100,
+            currency: 'INR',
+            description: `Order for ${session.name}`,
+            customer: {
+              name: session.name,
+              email: session.email,
+              contact: session.mobile,
+            },
+            notify: { sms: false, email: false },
+            callback_url: "https://wpbot.nanic.in/razorpay-webhook",
+            callback_method: "get",
+            options: {
+              checkout: {
+                name: "Nanic Ayurveda",
+                description: "Ayurvedic Products",
+                prefill: {
+                  name: session.name,
+                  email: session.email,
+                  contact: session.mobile
                 }
               }
-            });
-        
-            console.log('Razorpay payment link created successfully:', razorRes.id);
-            session.paymentLinkId = razorRes.id;
-            sessions[from] = session;
-            
-            await sendMessage(from, `💳 Complete your payment:\n${razorRes.short_url}\n\nWe'll confirm your order once payment is completed.`);
-          } catch (err) {
-            console.error('Razorpay error details:', {
-              message: err.message,
-              stack: err.stack,
-              response: err.response?.data,
-              statusCode: err.statusCode,
-              error: err.error
-            });
-            await sendMessage(from, '❌ Failed to generate payment link. Please try again.');
-          }
-          break;
-        
+            }
+          });
+          console.log('Razorpay payment link created successfully:', razorRes.id);
+          session.paymentLinkId = razorRes.id;
+          sessions[from] = session;
+          await sendMessage(from, `💳 Complete your payment:\n${razorRes.short_url}\n\nWe'll confirm your order once payment is completed.`);
+        } catch (err) {
+          console.error('Razorpay error details:', {
+            message: err.message,
+            stack: err.stack,
+            response: err.response?.data,
+            statusCode: err.statusCode,
+            error: err.error
+          });
+          await sendMessage(from, '❌ Failed to generate payment link. Please try again.');
+        }
+        handled = true;
+        break;
       case 'cancel_order':
         await sendMessage(from, '❌ Order cancelled. Type "Hi" to start over.');
         delete sessions[from];
+        handled = true;
+        break;
+      case 'use_address':
+        session.address = { ...session.foundAddress };
+        const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+        session.shipping = shipping;
+        session.totalWithShipping = session.total + shipping;
+        // Debug session data before sending confirmation
+        console.log('Session data after flow response:', {
+          name: session.name,
+          email: session.email,
+          mobile: session.mobile,
+          total: session.total,
+          shipping: session.shipping,
+          totalWithShipping: session.totalWithShipping
+        });
+        // Send confirmation with payment
+        const confirmButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'confirm_payment',
+              title: '💳 Proceed to Payment'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'cancel_order',
+              title: '❌ Cancel Order'
+            }
+          }
+        ];
+        await sendInteractiveMessage(
+          from,
+          '✅ Order Confirmation',
+          `Total: ₹${session.total}\nShipping: ₹${shipping}\n*Grand Total: ₹${session.totalWithShipping}*`,
+          confirmButtons
+        );
+        sessions[from] = session;
+        handled = true;
+        break;
+      case 'new_address':
+        session.step = 'address_line';
+        await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
+        sessions[from] = session;
+        handled = true;
+        break;
+      case 'retry_discount':
+        // If this session was created by a Flow, re-trigger the Flow UI
+        if (session.cart && session.total) {
+          // Re-send the Flow for discount code entry
+          const flowData = {
+            cart_summary: session.cart_summary || '', // or reconstruct from session.cart
+            total_amount: session.total.toString(),
+            currency: session.currency || 'INR',
+            name: session.name,
+            email: session.email,
+            mobile: session.mobile,
+            address: session.address?.line,
+            city: session.address?.city,
+            state: session.address?.state,
+            pincode: session.address?.pincode,
+            delivery_type: session.delivery_type,
+          };
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        } else {
+          // Fallback to text-based
+          session.step = 'discount_input';
+          await sendMessage(from, '🎟️ Please enter your discount code:');
+          sessions[from] = session;
+        }
+        handled = true;
+        break;
+      case 'skip_discount':
+        // Skip discount and proceed to payment
+        session.discount_code = '';
+        session.discount_value = 0;
+        session.totalWithShipping = session.total + session.shipping;
+        sessions[from] = session;
+        const confirmButtonsSkip = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'confirm_payment',
+              title: '💳 Proceed to Payment'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'cancel_order',
+              title: '❌ Cancel Order'
+            }
+          }
+        ];
+        await sendInteractiveMessage(
+          from,
+          '✅ Order Summary',
+          `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+          confirmButtonsSkip
+        );
+        handled = true;
         break;
     }
-    
-    return res.sendStatus(200);
+    if (handled) return res.sendStatus(200);
   }
 
   if (type === 'order') {
