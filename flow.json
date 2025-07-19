@@ -327,7 +327,6 @@
                       },
                       "delivery_type": "${form.delivery_type}",
                       "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
-                      "order_id": "ORD-${form.customer.mobile}",
                       "total_amount": "${data.total_amount}"
                     }
                   }
@@ -367,10 +366,6 @@
           "discount_code": {
             "type": "string",
             "__example__": "SAVE10"
-          },
-          "order_id": {
-            "type": "string",
-            "__example__": "ORD-123456"
           },
           "total_amount": {
             "type": "string",
@@ -423,7 +418,6 @@
                       },
                       "delivery_type": "${data.delivery_type}",
                       "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
-                      "order_id": "ORD-${data.customer\\.mobile}",
                       "total_amount": "${data.total_amount}"
                     }
                   }

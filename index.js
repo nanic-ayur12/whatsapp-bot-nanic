@@ -354,13 +354,6 @@ const handleFlowResponse = async (flowResponse, phone) => {
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
     
-    // Generate order ID if not provided or if it's still a template
-    if (!data.order_id || data.order_id.includes('${')) {
-      session.order_id = `ORD-${session.mobile || Date.now()}`;
-    } else {
-      session.order_id = data.order_id;
-    }
-
     // Delivery type logic
     let shipping = 0;
     if (session.delivery_type === 'pickup') {
