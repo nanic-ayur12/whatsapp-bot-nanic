@@ -36,7 +36,11 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "💰 Total Amount: ₹${data.total_amount}"
+                  "text": "💰 Total Amount: ₹"
+                },
+                {
+                  "type": "TextSubheading",
+                  "text": "${data.total_amount}"
                 },
                 {
                   "type": "TextSubheading",
@@ -240,7 +244,7 @@
                 {
                   "type": "TextBody",
                   "text": "📍 Store Address for Pickup:\nNo: 18, Mani Nagar, Sivanandapuram, Saravanampatti",
-                  "visible": false
+                  "visible": true
                 },
                 {
                   "type": "Footer",
