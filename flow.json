@@ -36,33 +36,29 @@
                 },
                 {
                   "type": "TextSubheading",
-                  "text": "💰 Total Amount:"
+                  "text": "💰 Total Amount: ₹${data.total_amount}"
                 },
-                {
-                    "type": "TextBody",
-                    "text": "${data.total_amount}"
-                  },
                 {
                   "type": "TextSubheading",
                   "text": "📋 Your Information"
                 },
                 {
                   "type": "TextInput",
-                  "name": "customer.name",
+                  "name": "name",
                   "label": "Full Name",
                   "required": true,
                   "input-type": "text"
                 },
                 {
                   "type": "TextInput",
-                  "name": "customer.email",
+                  "name": "email",
                   "label": "Email Address",
                   "required": true,
                   "input-type": "email"
                 },
                 {
                   "type": "TextInput",
-                  "name": "customer.mobile",
+                  "name": "mobile",
                   "label": "Mobile Number",
                   "required": true,
                   "input-type": "phone"
@@ -73,7 +69,7 @@
                 },
                 {
                   "type": "TextInput",
-                  "name": "address.line1",
+                  "name": "address",
                   "label": "Address Line",
                   "required": true,
                   "input-type": "text",
@@ -81,14 +77,14 @@
                 },
                 {
                   "type": "TextInput",
-                  "name": "address.city",
+                  "name": "city",
                   "label": "City",
                   "required": true,
                   "input-type": "text"
                 },
                 {
                   "type": "Dropdown",
-                  "name": "address.state",
+                  "name": "state",
                   "label": "State",
                   "required": true,
                   "data-source": [
@@ -133,7 +129,7 @@
                 },
                 {
                   "type": "TextInput",
-                  "name": "address.pincode",
+                  "name": "pincode",
                   "label": "Pincode",
                   "required": true,
                   "input-type": "number"
@@ -148,17 +144,14 @@
                       "name": "DELIVERY_OPTIONS"
                     },
                     "payload": {
-                      "customer": {
-                        "name": "${form.customer\\.name}",
-                        "email": "${form.customer\\.email}",
-                        "mobile": "${form.customer\\.mobile}"
-                      },
-                      "address": {
-                        "line1": "${form.address\\.line1}",
-                        "city": "${form.address\\.city}",
-                        "state": "${form.address\\.state}",
-                        "pincode": "${form.address\\.pincode}"
-                      }
+                      "name": "${form.name}",
+                      "email": "${form.email}",
+                      "mobile": "${form.mobile}",
+                      "address": "${form.address}",
+                      "city": "${form.city}",
+                      "state": "${form.state}",
+                      "pincode": "${form.pincode}",
+                      "total_amount": "${data.total_amount}"
                     }
                   }
                 }
@@ -172,22 +165,37 @@
         "title": "Delivery Options",
         "terminal": false,
         "data": {
-          "customer": {
-            "type": "object",
-            "__example__": {
-              "name": "John Doe",
-              "email": "john.doe@email.com",
-              "mobile": "+91 9876543210"
-            }
+          "name": {
+            "type": "string",
+            "__example__": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "__example__": "john.doe@email.com"
+          },
+          "mobile": {
+            "type": "string",
+            "__example__": "+91 9876543210"
           },
           "address": {
-            "type": "object",
-            "__example__": {
-              "line1": "No 1, Anna Street, Ganapathy Taluk",
-              "city": "Coimbatore",
-              "state": "TN",
-              "pincode": "641006"
-            }
+            "type": "string",
+            "__example__": "No 1, Anna Street, Ganapathy Taluk"
+          },
+          "city": {
+            "type": "string",
+            "__example__": "Coimbatore"
+          },
+          "state": {
+            "type": "string",
+            "__example__": "TN"
+          },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           }
         },
         "layout": {
@@ -234,18 +242,15 @@
                       "name": "DISCOUNT_CODE"
                     },
                     "payload": {
-                      "customer": {
-                        "name": "${data.customer\\.name}",
-                        "email": "${data.customer\\.email}",
-                        "mobile": "${data.customer\\.mobile}"
-                      },
-                      "address": {
-                        "line1": "${data.address\\.line1}",
-                        "city": "${data.address\\.city}",
-                        "state": "${data.address\\.state}",
-                        "pincode": "${data.address\\.pincode}"
-                      },
-                      "delivery_type": "${form.delivery_type}"
+                      "name": "${data.name}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
+                      "address": "${data.address}",
+                      "city": "${data.city}",
+                      "state": "${data.state}",
+                      "pincode": "${data.pincode}",
+                      "delivery_type": "${form.delivery_type}",
+                      "total_amount": "${data.total_amount}"
                     }
                   }
                 }
@@ -259,26 +264,41 @@
         "title": "Discount Code",
         "terminal": false,
         "data": {
-          "customer": {
-            "type": "object",
-            "__example__": {
-              "name": "John Doe",
-              "email": "john.doe@email.com",
-              "mobile": "+91 9876543210"
-            }
+          "name": {
+            "type": "string",
+            "__example__": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "__example__": "john.doe@email.com"
+          },
+          "mobile": {
+            "type": "string",
+            "__example__": "+91 9876543210"
           },
           "address": {
-            "type": "object",
-            "__example__": {
-              "line1": "No 1, Anna Street, Ganapathy Taluk",
-              "city": "Coimbatore",
-              "state": "TN",
-              "pincode": "641006"
-            }
+            "type": "string",
+            "__example__": "No 1, Anna Street, Ganapathy Taluk"
+          },
+          "city": {
+            "type": "string",
+            "__example__": "Coimbatore"
+          },
+          "state": {
+            "type": "string",
+            "__example__": "TN"
+          },
+          "pincode": {
+            "type": "string",
+            "__example__": "641006"
           },
           "delivery_type": {
             "type": "string",
             "__example__": "ship"
+          },
+          "total_amount": {
+            "type": "string",
+            "__example__": "800"
           }
         },
         "layout": {
@@ -308,116 +328,17 @@
                   "type": "Footer",
                   "label": "Apply & Continue",
                   "on-click-action": {
-                    "name": "navigate",
-                    "next": {
-                      "type": "screen",
-                      "name": "ORDER_CONFIRMATION"
-                    },
-                    "payload": {
-                      "customer": {
-                        "name": "${form.customer.name}",
-                        "email": "${form.customer.email}",
-                        "mobile": "${form.customer.mobile}"
-                      },
-                      "address": {
-                        "line1": "${form.address.line1}",
-                        "city": "${form.address.city}",
-                        "state": "${form.address.state}",
-                        "pincode": "${form.address.pincode}"
-                      },
-                      "delivery_type": "${form.delivery_type}",
-                      "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
-                      "total_amount": "${data.total_amount}"
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      },
-      {
-        "id": "ORDER_CONFIRMATION",
-        "title": "Order Confirmed",
-        "terminal": true,
-        "success": true,
-        "data": {
-          "customer": {
-            "type": "object",
-            "__example__": {
-              "name": "John Doe",
-              "email": "john.doe@email.com",
-              "mobile": "+91 9876543210"
-            }
-          },
-          "address": {
-            "type": "object",
-            "__example__": {
-              "line1": "No 1, Anna Street, Ganapathy Taluk",
-              "city": "Coimbatore",
-              "state": "TN",
-              "pincode": "641006"
-            }
-          },
-          "delivery_type": {
-            "type": "string",
-            "__example__": "ship"
-          },
-          "discount_code": {
-            "type": "string",
-            "__example__": "SAVE10"
-          },
-          "total_amount": {
-            "type": "string",
-            "__example__": "800"
-          }
-        },
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            {
-              "type": "Form",
-              "name": "confirmation_form",
-              "children": [
-                {
-                  "type": "TextHeading",
-                  "text": "🎉 Order Placed Successfully!"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "Thank you! Your order has been successfully placed. Please proceed to payment to complete your purchase."
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "💰 Total Amount:"
-                },
-                {
-                  "type": "TextSubheading",
-                  "text": "₹${data.total_amount}"
-                },
-                {
-                  "type": "TextBody",
-                  "text": "You will receive a confirmation email shortly with your order details and payment instructions."
-                },
-                {
-                  "type": "Footer",
-                  "label": "Close",
-                  "on-click-action": {
                     "name": "complete",
                     "payload": {
-                      "customer": {
-                        "name": "${data.customer\\.name}",
-                        "email": "${data.customer\\.email}",
-                        "mobile": "${data.customer\\.mobile}"
-                      },
-                      "address": {
-                        "line1": "${data.address\\.line1}",
-                        "city": "${data.address\\.city}",
-                        "state": "${data.address\\.state}",
-                        "pincode": "${data.address\\.pincode}"
-                      },
+                      "name": "${data.name}",
+                      "email": "${data.email}",
+                      "mobile": "${data.mobile}",
+                      "address": "${data.address}",
+                      "city": "${data.city}",
+                      "state": "${data.state}",
+                      "pincode": "${data.pincode}",
                       "delivery_type": "${data.delivery_type}",
-                      "discount_code": "${form.discount_code && form.discount_code !== '' ? form.discount_code : 'None applied'}",
+                      "discount_code": "${form.discount_code}",
                       "total_amount": "${data.total_amount}"
                     }
                   }
