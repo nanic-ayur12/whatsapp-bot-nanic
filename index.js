@@ -340,13 +340,8 @@ const handleFlowResponse = async (flowResponse, phone) => {
     let shipping = 0;
     if (session.delivery_type === 'pickup') {
       shipping = 0;
-      session.address = {
-        line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
-        city: 'Coimbatore',
-        state: 'TN',
-        pincode: '641035',
-        country: 'India'
-      };
+      // Do NOT overwrite the address; keep the customer's own address
+      // session.address remains as filled by the user/flow
     } else {
       const state = session.address.state?.toLowerCase().replace(/\s+/g, '');
       shipping = ['tn', 'tamilnadu'].includes(state) ? 40 : 80;
@@ -1002,9 +997,29 @@ app.post('/webhook', async (req, res) => {
       await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
       sessions[from] = session;
     } else if (buttonId === 'retry_discount') {
-      session.step = 'discount_input';
-      await sendMessage(from, '🎟️ Please enter your discount code:');
-      sessions[from] = session;
+      // If this session was created by a Flow, re-trigger the Flow UI
+      if (session.cart && session.total) {
+        // Re-send the Flow for discount code entry
+        const flowData = {
+          cart_summary: session.cart_summary || '', // or reconstruct from session.cart
+          total_amount: session.total.toString(),
+          currency: session.currency || 'INR',
+          name: session.name,
+          email: session.email,
+          mobile: session.mobile,
+          address: session.address?.line,
+          city: session.address?.city,
+          state: session.address?.state,
+          pincode: session.address?.pincode,
+          delivery_type: session.delivery_type,
+        };
+        await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+      } else {
+        // Fallback to text-based
+        session.step = 'discount_input';
+        await sendMessage(from, '🎟️ Please enter your discount code:');
+        sessions[from] = session;
+      }
     } else if (buttonId === 'skip_discount') {
       // Skip discount and proceed to payment
       session.discount_code = '';
