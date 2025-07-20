@@ -114,8 +114,7 @@ const productDetails = {
   '41386853990446': { name: 'Aloe Vera Hair Cleanser', price: 245 },
   '41392567255086': { name: 'Traditional Kajal', price: 225 },
   '41374936727598': { name: 'Traditional Kumkum', price: 199 },
-  '41422183333934': { name: 'Bhringaraj Hair Cleanser', price: 216 },
-  '41462328623150': { name: 'Test Product Not For Sale', price: 1 }
+  '41422183333934': { name: 'Bhringaraj Hair Cleanser', price: 216 }
 };
 
 app.get("/webhook", (req, res) => {
@@ -126,34 +125,36 @@ app.get("/webhook", (req, res) => {
   res.sendStatus(403);
 });
 
-// Send Catalog Message
+// Send catalog message
 const sendCatalogMessage = async (phone) => {
   updateActivity();
   
-  try {
-    // Send native WhatsApp catalog message
-    const message = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: phone,
-      type: 'interactive',
-      interactive: {
-        type: 'catalog_message', 
-        body: {
-          text: '🛍️ Browse our complete product catalog below. Select items and quantities, then click "Send" to place your order.'
-        },
-        footer: {
-          text: 'Nanic Ayurveda'
-        },
-        action: {
-          name: 'catalog_message'
+  const catalogMessage = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: phone,
+    type: 'interactive',
+    interactive: {
+      type: 'catalog_message',
+      body: {
+        text: '🛍️ Browse our Ayurvedic products catalog below:'
+      },
+      footer: {
+        text: 'Nanic Ayurveda'
+      },
+      action: {
+        name: 'catalog_message',
+        parameters: {
+          thumbnail_product_retailer_id: '41392567746606' // Use first product as thumbnail
         }
       }
-    };
+    }
+  };
 
-    const response = await axios.post(
+  try {
+    await axios.post(
       `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-      message,
+      catalogMessage,
       {
         headers: {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
@@ -161,51 +162,10 @@ const sendCatalogMessage = async (phone) => {
         }
       }
     );
-
-    console.log('Native catalog message sent successfully');
   } catch (error) {
-    console.error('Failed to send catalog message:', error.response?.data || error.message);
-    
-    // Fallback: Try single product message to trigger catalog
-    try {
-      const fallbackMessage = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: phone,
-        type: 'interactive',
-        interactive: {
-          type: 'product',
-          body: {
-            text: '🛍️ View our product catalog'
-          },
-          footer: {
-            text: 'Nanic Ayurveda'
-          },
-          action: {
-            catalog_id: process.env.WHATSAPP_CATALOG_ID || '',
-            product_retailer_id: '41392567746606' // Your first product ID
-          }
-        }
-      };
-
-      await axios.post(
-        `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-        fallbackMessage,
-        {
-          headers: {
-            Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-            'Content-Type': 'application/json',
-          }
-        }
-      );
-      
-      console.log('Fallback product message sent');
-    } catch (fallbackError) {
-      console.error('Fallback product message also failed:', fallbackError.response?.data || fallbackError.message);
-      
-      // Final fallback to text message
-      await sendMessage(phone, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
-    }
+    console.error('Catalog message error:', error.response?.data || error.message);
+    // Fallback to text message with link if catalog fails
+    await sendMessage(phone, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
   }
 };
 
@@ -271,7 +231,6 @@ const sendFlowMessage = async (phone, flowId, flowData = {}) => {
 const sendInteractiveMessage = async (phone, headerText, bodyText, buttons) => {
   updateActivity();
   
-  // No need to format catalog buttons, just use buttons as is
   const message = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -357,6 +316,57 @@ const sendMessage = async (phone, message) => {
   );
 };
 
+// Helper: Get customer addresses from Shopify
+async function getCustomerAddresses(searchType, searchValue) {
+  try {
+    let searchQuery;
+    if (searchType === 'phone') {
+      searchQuery = `phone:${searchValue}`;
+    } else if (searchType === 'email') {
+      searchQuery = `email:${searchValue}`;
+    } else {
+      return { customer: null, addresses: [] };
+    }
+
+    const customerSearchRes = await axios.get(
+      `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=${encodeURIComponent(searchQuery)}`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+        },
+      }
+    );
+
+    const customers = customerSearchRes.data.customers;
+    if (customers.length === 0) {
+      return { customer: null, addresses: [] };
+    }
+
+    const customer = customers[0];
+    const addressesRes = await axios.get(
+      `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+        },
+      }
+    );
+
+    return { 
+      customer: customer, 
+      addresses: addressesRes.data.addresses || [] 
+    };
+  } catch (error) {
+    console.error('Error fetching customer addresses:', error.response?.data || error.message);
+    return { customer: null, addresses: [] };
+  }
+}
+
+// Helper: Format address for display
+function formatAddress(address, index) {
+  return `${index}. ${address.name || 'No Name'}\n${address.address1 || ''}\n${address.city || ''}, ${address.province || ''} - ${address.zip || ''}\n${address.country || 'India'}\n📞 ${address.phone || 'No phone'}`;
+}
+
 // Helper: Validate discount code with Shopify
 async function validateDiscountCode(code, total) {
   if (!code) return { valid: false };
@@ -402,32 +412,34 @@ const handleFlowResponse = async (flowResponse, phone) => {
   try {
     const { flow_token, response_json } = flowResponse;
     const data = JSON.parse(response_json);
-    console.log('Flow response data:', JSON.stringify(data, null, 2)); // Debug log
     const session = sessions[phone] || {};
 
     // Update session with flow data
-    session.name = data.name || '';
-    session.email = data.email || '';
-    session.mobile = data.mobile || '';
+    session.name = data.name;
+    session.email = data.email;
+    session.mobile = data.mobile;
     session.address = {
-      line: data.address || '',
-      city: data.city || '',
-      state: data.state || '',
-      pincode: data.pincode || ''
+      line: data.address,
+      city: data.city,
+      state: data.state,
+      pincode: data.pincode
     };
-
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
-    
+
     // Delivery type logic
     let shipping = 0;
     if (session.delivery_type === 'pickup') {
       shipping = 0;
-      // Do NOT overwrite the address; keep the customer's own address
-      // session.address remains as filled by the user/flow
+      session.address = {
+        line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
+        city: 'Coimbatore',
+        state: 'TN',
+        pincode: '641035',
+        country: 'India'
+      };
     } else {
-      const state = session.address.state?.toLowerCase().replace(/\s+/g, '');
-      shipping = ['tn', 'tamilnadu'].includes(state) ? 40 : 80;
+      shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
     }
     session.shipping = shipping;
 
@@ -435,40 +447,14 @@ const handleFlowResponse = async (flowResponse, phone) => {
     let discountAmount = 0;
     let discountMsg = '';
     if (session.discount_code) {
-      const discountRes = await validateDiscountCode(session.discount_code, session.total + shipping);
+      const discountRes = await validateDiscountCode(session.discount_code, session.total);
       if (discountRes.valid) {
         discountAmount = discountRes.amount;
         session.discount_value = discountAmount;
         discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
       } else {
         session.discount_value = 0;
-        // Offer retry/skip options and return early
-        const retryButtons = [
-          {
-            type: 'reply',
-            reply: {
-              id: 'retry_discount',
-              title: '🔄 Try Another Code'
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'skip_discount',
-              title: '⏭️ Skip Discount'
-            }
-          }
-        ];
-
-        await sendInteractiveMessage(
-          phone,
-          '❌ Invalid Discount Code',
-          `Sorry, the discount code "${session.discount_code}" is invalid or expired.\n\nWould you like to try another discount code?`,
-          retryButtons
-        );
-        session.step = 'discount_retry';
-        sessions[phone] = session;
-        return; // Stop further processing
+        discountMsg = `\n❌ Discount code invalid or expired.`;
       }
     } else {
       session.discount_value = 0;
@@ -499,7 +485,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     await sendInteractiveMessage(
       phone,
       '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
       confirmButtons
     );
   } catch (error) {
@@ -524,28 +510,147 @@ app.post('/webhook', async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Handle interactive button responses (ALL BUTTONS HANDLED HERE)
+  // Handle interactive button responses
   if (type === 'interactive' && msg.interactive?.type === 'button_reply') {
     const buttonId = msg.interactive.button_reply.id;
-    let handled = false;
+    
     switch (buttonId) {
       case 'catalog':
         if (session.lastOrder && session.lastOrder.status === 'Not fulfilled yet') {
           const orderMsg = `🧾 Your recent order is already being processed.\n\n*ORDER ID:* ${session.lastOrder.name}\n*ORDER DATE:* ${new Date(session.lastOrder.date).toLocaleDateString()}\n*STATUS:* ${session.lastOrder.status}\n\nIf you want to place another order, message *New*.`;
           await sendMessage(from, orderMsg);
         } else {
-          await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
+          // Send catalog message instead of text with link
+          await sendCatalogMessage(from);
         }
-        handled = true;
         break;
+        
       case 'track':
         session.step = 'track_order';
         await sendMessage(from, 'Please enter your *Order ID* to track your order.');
         sessions[from] = session;
-        handled = true;
         break;
+
+      case 'use_existing_address':
+        session.step = 'get_mobile_for_address';
+        await sendMessage(from, 'Please enter your *Mobile Number* to check for existing addresses:');
+        sessions[from] = session;
+        break;
+
+      case 'enter_new_address':
+        // Send flow for new address entry
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cartSummary,
+            total_amount: session.total.toString(),
+            currency: 'INR'
+          };
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        } else {
+          // Fallback to traditional method
+          session.step = 'name';
+          await sendMessage(from, '🧾 Please enter your *Name*');
+          sessions[from] = session;
+        }
+        break;
+
+      case 'check_email_address':
+        session.step = 'get_email_for_address';
+        await sendMessage(from, 'Please enter your *Email Address* to check for existing addresses:');
+        sessions[from] = session;
+        break;
+
+      case 'no_email_check':
+        // Send flow for new address entry
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cartSummary,
+            total_amount: session.total.toString(),
+            currency: 'INR'
+          };
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        } else {
+          // Fallback to traditional method
+          session.step = 'name';
+          await sendMessage(from, '🧾 Please enter your *Name*');
+          sessions[from] = session;
+        }
+        break;
+
+      case 'delivery_ship':
+        session.delivery_type = 'ship';
+        session.step = 'ask_discount_code';
+        
+        const discountButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'yes_discount',
+              title: '✅ Yes, I have one'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'no_discount',
+              title: '❌ No discount code'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '🎟️ Discount Code',
+          'Do you have a discount code to apply?',
+          discountButtons
+        );
+        sessions[from] = session;
+        break;
+
+      case 'delivery_pickup':
+        session.delivery_type = 'pickup';
+        session.step = 'ask_discount_code';
+        
+        const discountButtonsPickup = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'yes_discount',
+              title: '✅ Yes, I have one'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'no_discount',
+              title: '❌ No discount code'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '🎟️ Discount Code',
+          'Do you have a discount code to apply?',
+          discountButtonsPickup
+        );
+        sessions[from] = session;
+        break;
+
+      case 'yes_discount':
+        session.step = 'enter_discount_code';
+        await sendMessage(from, 'Please enter your *Discount Code*:');
+        sessions[from] = session;
+        break;
+
+      case 'no_discount':
+        session.discount_code = '';
+        await generateOrderSummary(from, session);
+        break;
+        
       case 'confirm_payment':
         session.step = 'payment';
+        
         // Add validation before creating payment link
         if (!session.totalWithShipping || !session.name || !session.email || !session.mobile) {
           console.error('Missing required session data:', {
@@ -555,9 +660,9 @@ app.post('/webhook', async (req, res) => {
             mobile: session.mobile
           });
           await sendMessage(from, '❌ Missing order information. Please start over by typing "Hi".');
-          handled = true;
           break;
         }
+      
         try {
           console.log('Creating Razorpay payment link with data:', {
             amount: session.totalWithShipping * 100,
@@ -569,6 +674,7 @@ app.post('/webhook', async (req, res) => {
               contact: session.mobile,
             }
           });
+      
           const razorRes = await razorpay.paymentLink.create({
             amount: session.totalWithShipping * 100,
             currency: 'INR',
@@ -593,9 +699,11 @@ app.post('/webhook', async (req, res) => {
               }
             }
           });
+      
           console.log('Razorpay payment link created successfully:', razorRes.id);
           session.paymentLinkId = razorRes.id;
           sessions[from] = session;
+          
           await sendMessage(from, `💳 Complete your payment:\n${razorRes.short_url}\n\nWe'll confirm your order once payment is completed.`);
         } catch (err) {
           console.error('Razorpay error details:', {
@@ -607,117 +715,15 @@ app.post('/webhook', async (req, res) => {
           });
           await sendMessage(from, '❌ Failed to generate payment link. Please try again.');
         }
-        handled = true;
         break;
+      
       case 'cancel_order':
         await sendMessage(from, '❌ Order cancelled. Type "Hi" to start over.');
         delete sessions[from];
-        handled = true;
-        break;
-      case 'use_address':
-        session.address = { ...session.foundAddress };
-        const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-        session.shipping = shipping;
-        session.totalWithShipping = session.total + shipping;
-        // Debug session data before sending confirmation
-        console.log('Session data after flow response:', {
-          name: session.name,
-          email: session.email,
-          mobile: session.mobile,
-          total: session.total,
-          shipping: session.shipping,
-          totalWithShipping: session.totalWithShipping
-        });
-        // Send confirmation with payment
-        const confirmButtons = [
-          {
-            type: 'reply',
-            reply: {
-              id: 'confirm_payment',
-              title: '💳 Proceed to Payment'
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'cancel_order',
-              title: '❌ Cancel Order'
-            }
-          }
-        ];
-        await sendInteractiveMessage(
-          from,
-          '✅ Order Confirmation',
-          `Total: ₹${session.total}\nShipping: ₹${shipping}\n*Grand Total: ₹${session.totalWithShipping}*`,
-          confirmButtons
-        );
-        sessions[from] = session;
-        handled = true;
-        break;
-      case 'new_address':
-        session.step = 'address_line';
-        await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-        sessions[from] = session;
-        handled = true;
-        break;
-      case 'retry_discount':
-        // If this session was created by a Flow, re-trigger the Flow UI
-        if (session.cart && session.total) {
-          // Re-send the Flow for discount code entry
-          const flowData = {
-            cart_summary: session.cart_summary || '', // or reconstruct from session.cart
-            total_amount: session.total.toString(),
-            currency: session.currency || 'INR',
-            name: session.name,
-            email: session.email,
-            mobile: session.mobile,
-            address: session.address?.line,
-            city: session.address?.city,
-            state: session.address?.state,
-            pincode: session.address?.pincode,
-            delivery_type: session.delivery_type,
-          };
-          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-        } else {
-          // Fallback to text-based
-          session.step = 'discount_input';
-          await sendMessage(from, '🎟️ Please enter your discount code:');
-          sessions[from] = session;
-        }
-        handled = true;
-        break;
-      case 'skip_discount':
-        // Skip discount and proceed to payment
-        session.discount_code = '';
-        session.discount_value = 0;
-        session.totalWithShipping = session.total + session.shipping;
-        sessions[from] = session;
-        const confirmButtonsSkip = [
-          {
-            type: 'reply',
-            reply: {
-              id: 'confirm_payment',
-              title: '💳 Proceed to Payment'
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'cancel_order',
-              title: '❌ Cancel Order'
-            }
-          }
-        ];
-        await sendInteractiveMessage(
-          from,
-          '✅ Order Summary',
-          `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
-          confirmButtonsSkip
-        );
-        handled = true;
         break;
     }
-    if (handled) return res.sendStatus(200);
+    
+    return res.sendStatus(200);
   }
 
   if (type === 'order') {
@@ -750,23 +756,34 @@ app.post('/webhook', async (req, res) => {
     });
 
     session.total = total;
-    session.step = 'checkout_flow';
+    session.cartSummary = summary;
+    session.step = 'address_choice';
     sessions[from] = session;
 
-    // Send flow for checkout if flow ID is configured
-    if (FLOW_IDS.CHECKOUT) {
-      const flowData = {
-        cart_summary: summary,
-        total_amount: total.toString(), // Convert to string
-        currency: 'INR'
-      };
-      
-      await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-    } else {
-      // Fallback to traditional method
-      await sendMessage(from, summary + '\n🧾 Please enter your *Name*');
-      session.step = 'name';
-    }
+    // Ask if user wants to use existing address or enter new one
+    const addressButtons = [
+      {
+        type: 'reply',
+        reply: {
+          id: 'use_existing_address',
+          title: '📋 Use Existing Address'
+        }
+      },
+      {
+        type: 'reply',
+        reply: {
+          id: 'enter_new_address',
+          title: '📝 Enter New Address'
+        }
+      }
+    ];
+
+    await sendInteractiveMessage(
+      from,
+      '📦 Address Selection',
+      `${summary}\nWould you like to use an existing address or enter a new one?`,
+      addressButtons
+    );
     
     return res.sendStatus(200);
   }
@@ -786,14 +803,14 @@ app.post('/webhook', async (req, res) => {
         const orderMsg = `🧾 Your recent order is already being processed.\n\n*ORDER ID:* ${session.lastOrder.name}\n*ORDER DATE:* ${new Date(session.lastOrder.date).toLocaleDateString()}\n*STATUS:* ${session.lastOrder.status}\n\nIf you want to place another order, message *New*.`;
         await sendMessage(from, orderMsg);
       } else {
-        await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
+        await sendCatalogMessage(from);
       }
       return res.sendStatus(200);
     }
 
     if (text.toLowerCase() === 'new') {
       sessions[from] = { step: 'start' };
-      await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
+      await sendCatalogMessage(from);
       return res.sendStatus(200);
     }
 
@@ -801,6 +818,206 @@ app.post('/webhook', async (req, res) => {
       session.step = 'track_order';
       await sendMessage(from, 'Please enter your *Order ID* to track your order.');
       sessions[from] = session;
+      return res.sendStatus(200);
+    }
+
+    // Handle mobile number input for address lookup
+    if (session.step === 'get_mobile_for_address') {
+      const mobile = text.replace(/\D/g, ''); // Remove non-digits
+      const { customer, addresses } = await getCustomerAddresses('phone', mobile);
+      
+      if (addresses.length > 0) {
+        session.customer = customer;
+        session.availableAddresses = addresses;
+        
+        if (addresses.length === 1) {
+          // Only one address, use it directly
+          const address = addresses[0];
+          session.selectedAddress = address;
+          session.name = address.name || customer.first_name || '';
+          session.email = customer.email || '';
+          session.mobile = mobile;
+          
+          // Ask for delivery type
+          const deliveryButtons = [
+            {
+              type: 'reply',
+              reply: {
+                id: 'delivery_ship',
+                title: '🚚 Ship to Address'
+              }
+            },
+            {
+              type: 'reply',
+              reply: {
+                id: 'delivery_pickup',
+                title: '🏪 Pickup from Store'
+              }
+            }
+          ];
+
+          await sendInteractiveMessage(
+            from,
+            '🚚 Delivery Method',
+            `Address found:\n${formatAddress(address, 1)}\n\nHow would you like to receive your order?`,
+            deliveryButtons
+          );
+        } else {
+          // Multiple addresses, let user choose
+          let addressList = 'Multiple addresses found. Please reply with the number of your preferred address:\n\n';
+          addresses.forEach((addr, index) => {
+            addressList += formatAddress(addr, index + 1) + '\n\n';
+          });
+          
+          session.step = 'select_address_number';
+          await sendMessage(from, addressList);
+        }
+        sessions[from] = session;
+      } else {
+        // No addresses found for mobile, ask if they want to check email
+        const emailButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'check_email_address',
+              title: '📧 Check with Email'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'no_email_check',
+              title: '📝 Enter New Address'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '📍 No Address Found',
+          'No existing address found for this mobile number. Would you like to check with your email address instead?',
+          emailButtons
+        );
+        sessions[from] = session;
+      }
+      return res.sendStatus(200);
+    }
+
+    // Handle email input for address lookup
+    if (session.step === 'get_email_for_address') {
+      const email = text.trim();
+      const { customer, addresses } = await getCustomerAddresses('email', email);
+      
+      if (addresses.length > 0) {
+        session.customer = customer;
+        session.availableAddresses = addresses;
+        
+        if (addresses.length === 1) {
+          // Only one address, use it directly
+          const address = addresses[0];
+          session.selectedAddress = address;
+          session.name = address.name || customer.first_name || '';
+          session.email = email;
+          session.mobile = address.phone || '';
+          
+          // Ask for delivery type
+          const deliveryButtons = [
+            {
+              type: 'reply',
+              reply: {
+                id: 'delivery_ship',
+                title: '🚚 Ship to Address'
+              }
+            },
+            {
+              type: 'reply',
+              reply: {
+                id: 'delivery_pickup',
+                title: '🏪 Pickup from Store'
+              }
+            }
+          ];
+
+          await sendInteractiveMessage(
+            from,
+            '🚚 Delivery Method',
+            `Address found:\n${formatAddress(address, 1)}\n\nHow would you like to receive your order?`,
+            deliveryButtons
+          );
+        } else {
+          // Multiple addresses, let user choose
+          let addressList = 'Multiple addresses found. Please reply with the number of your preferred address:\n\n';
+          addresses.forEach((addr, index) => {
+            addressList += formatAddress(addr, index + 1) + '\n\n';
+          });
+          
+          session.step = 'select_address_number';
+          await sendMessage(from, addressList);
+        }
+        sessions[from] = session;
+      } else {
+        // No addresses found for email either, proceed with new address
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cartSummary,
+            total_amount: session.total.toString(),
+            currency: 'INR'
+          };
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        } else {
+          session.step = 'name';
+          await sendMessage(from, '📍 No existing address found. Please enter your *Name*:');
+          sessions[from] = session;
+        }
+      }
+      return res.sendStatus(200);
+    }
+
+    // Handle address selection by number
+    if (session.step === 'select_address_number') {
+      const addressIndex = parseInt(text) - 1;
+      if (addressIndex >= 0 && addressIndex < session.availableAddresses.length) {
+        const address = session.availableAddresses[addressIndex];
+        session.selectedAddress = address;
+        session.name = address.name || session.customer.first_name || '';
+        session.email = session.customer.email || '';
+        session.mobile = address.phone || '';
+        
+        // Ask for delivery type
+        const deliveryButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'delivery_ship',
+              title: '🚚 Ship to Address'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'delivery_pickup',
+              title: '🏪 Pickup from Store'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '🚚 Delivery Method',
+          `Selected address:\n${formatAddress(address, 1)}\n\nHow would you like to receive your order?`,
+          deliveryButtons
+        );
+        sessions[from] = session;
+      } else {
+        await sendMessage(from, '❌ Invalid selection. Please enter a valid address number.');
+      }
+      return res.sendStatus(200);
+    }
+
+    // Handle discount code entry
+    if (session.step === 'enter_discount_code') {
+      session.discount_code = text.trim();
+      await generateOrderSummary(from, session);
       return res.sendStatus(200);
     }
 
@@ -842,76 +1059,6 @@ app.post('/webhook', async (req, res) => {
 
     // Handle traditional checkout flow (fallback when flows are not available)
     switch (session.step) {
-      case 'discount_input':
-        const discountCode = text.trim();
-        if (discountCode) {
-          const discountRes = await validateDiscountCode(discountCode, session.total);
-          if (discountRes.valid) {
-            session.discount_code = discountCode;
-            session.discount_value = discountRes.amount;
-            session.totalWithShipping = session.total + session.shipping - discountRes.amount;
-            if (session.totalWithShipping < 0) session.totalWithShipping = 0;
-            sessions[from] = session;
-
-            const confirmButtons = [
-              {
-                type: 'reply',
-                reply: {
-                  id: 'confirm_payment',
-                  title: '💳 Proceed to Payment'
-                }
-              },
-              {
-                type: 'reply',
-                reply: {
-                  id: 'cancel_order',
-                  title: '❌ Cancel Order'
-                }
-              }
-            ];
-
-            await sendInteractiveMessage(
-              from,
-              '✅ Discount Applied Successfully!',
-              `🎉 Great! Your discount code "${discountCode}" has been applied!\n\nOrder Summary:\n📦 Items Total: ₹${session.total}\n🎟️ Discount Applied: -₹${discountRes.amount} (${discountCode})\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
-              confirmButtons
-            );
-          } else {
-            const retryButtons = [
-              {
-                type: 'reply',
-                reply: {
-                  id: 'retry_discount',
-                   title: '🔄 Try Another Code'
-                }
-              },
-              {
-                type: 'reply',
-                reply: {
-                  id: 'skip_discount',
-                   title: '⏭️ Skip Discount'
-                }
-              }
-            ];
-
-            await sendInteractiveMessage(
-              from,
-              '❌ Invalid Discount Code',
-              `Sorry, the discount code "${discountCode}" is invalid or expired.\n\nWould you like to try another discount code?`,
-              retryButtons
-            );
-            session.step = 'discount_retry';
-            sessions[from] = session;
-          }
-        } else {
-          await sendMessage(from, '❓ Please enter a valid discount code or type "skip" to continue without discount.');
-        }
-        break;
-
-      case 'discount_retry':
-        // This case is handled by button responses below
-        break;
-
       case 'name':
         session.name = text;
         session.step = 'email';
@@ -926,140 +1073,8 @@ app.post('/webhook', async (req, res) => {
 
       case 'mobile':
         session.mobile = text;
-        session.step = 'checking_address';
-        sessions[from] = session;
-
-        try {
-          const customerSearchRes = await axios.get(
-            `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=email:${session.email}`,
-            {
-              headers: {
-                'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-              },
-            }
-          );
-
-          const customers = customerSearchRes.data.customers;
-
-          if (customers.length > 0) {
-            const customer = customers[0];
-            session.customerId = customer.id;
-
-            const addressesRes = await axios.get(
-              `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
-              {
-                headers: {
-                  'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-                },
-              }
-            );
-
-            const addresses = addressesRes.data.addresses;
-
-            if (addresses.length > 0) {
-              const defaultAddr = customer.default_address || addresses[0];
-
-              if (!defaultAddr.address1 || !defaultAddr.city || !defaultAddr.zip) {
-                session.step = 'address_line';
-                await sendMessage(
-                  from,
-                  '🏠 Your saved address is incomplete. Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)'
-                );
-              } else {
-                session.foundAddress = {
-                  name: defaultAddr.name || session.name || '',
-                  line: defaultAddr.address1,
-                  city: defaultAddr.city,
-                  state: defaultAddr.province || '',
-                  country: defaultAddr.country || 'India',
-                  pincode: defaultAddr.zip,
-                  phone: defaultAddr.phone || session.mobile || '',
-                };
-
-                session.step = 'reuse_address';
-
-                const fullAddress = `${session.foundAddress.name}
-                ${session.foundAddress.line},
-                ${session.foundAddress.city}, ${session.foundAddress.state} - ${session.foundAddress.pincode}
-                ${session.foundAddress.country}
-                📞 ${session.foundAddress.phone}`.trim();
-
-                const addressButtons = [
-                  {
-                    type: 'reply',
-                    reply: {
-                      id: 'use_address',
-                      title: '✅ Use This Address'
-                    }
-                  },
-                  {
-                    type: 'reply',
-                    reply: {
-                      id: 'new_address',
-                      title: '📝 Enter New Address'
-                    }
-                  }
-                ];
-
-                await sendInteractiveMessage(
-                  from,
-                  '📦 Existing Address Found',
-                  `We found this address:\n${fullAddress}\n\nWould you like to use this address?`,
-                  addressButtons
-                );
-              }
-            } else {
-              session.step = 'address_line';
-              await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-            }
-          } else {
-            session.step = 'address_line';
-            await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-          }
-        } catch (err) {
-          console.error('Shopify customer/address lookup error:', err?.response?.data || err.message);
-          session.step = 'address_line';
-          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-        }
-        break;
-
-      case 'reuse_address':
-        if (text.toLowerCase() === 'yes') {
-          session.address = { ...session.foundAddress };
-          session.step = 'pincode_confirmed';
-          const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-          session.shipping = shipping;
-          session.totalWithShipping = session.total + shipping;
-
-          const confirmButtons = [
-            {
-              type: 'reply',
-              reply: {
-                id: 'confirm_payment',
-                title: '💳 Proceed to Payment'
-              }
-            },
-            {
-              type: 'reply',
-              reply: {
-                id: 'cancel_order',
-                title: '❌ Cancel Order'
-              }
-            }
-          ];
-
-          await sendInteractiveMessage(
-            phone,
-            '✅ Order Summary',
-            `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
-            confirmButtons
-          );
-        } else if (text.toLowerCase() === 'no') {
-          session.step = 'address_line';
-          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-        } else {
-          await sendMessage(from, '❓ Please reply with *Yes* or *No*.');
-        }
+        session.step = 'address_line';
+        await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
         break;
 
       case 'address_line':
@@ -1082,33 +1097,7 @@ app.post('/webhook', async (req, res) => {
 
       case 'pincode':
         session.address.pincode = text;
-        const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-        session.shipping = shipping;
-        session.totalWithShipping = session.total + shipping;
-
-        const confirmButtons = [
-          {
-            type: 'reply',
-            reply: {
-              id: 'confirm_payment',
-              title: '💳 Proceed to Payment'
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'cancel_order',
-              title: '❌ Cancel Order'
-            }
-          }
-        ];
-
-        await sendInteractiveMessage(
-          from,
-          '✅ Order Confirmation',
-          `Total: ₹${session.total}\nShipping: ₹${shipping}\n*Grand Total: ₹${session.totalWithShipping}*`,
-          confirmButtons
-        );
+        await generateOrderSummary(from, session);
         break;
 
       case 'payment':
@@ -1127,277 +1116,80 @@ app.post('/webhook', async (req, res) => {
     sessions[from] = session;
   }
 
-  // Handle interactive button responses for address selection
-  if (type === 'interactive' && msg.interactive?.type === 'button_reply') {
-    const buttonId = msg.interactive.button_reply.id;
-    
-    if (buttonId === 'use_selected_address') {
-      // Use the selected existing address
-      const address = session.selectedAddress;
-      session.name = address.name || address.first_name || session.customerData?.first_name || '';
-      session.email = session.customerData?.email || '';
-      session.mobile = address.phone || session.customerData?.phone || '';
-      session.address = {
-        line: address.address1,
-        city: address.city,
-        state: address.province,
-        pincode: address.zip,
-        country: address.country || 'India'
-      };
-      session.customerId = session.customerData?.id;
-      
-      // Ask for delivery type
-      const deliveryButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'delivery_ship',
-            title: '🚚 Ship to Address'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'delivery_pickup',
-            title: '🏪 Pickup from Store'
-          }
-        }
-      ];
-      
-      await sendInteractiveMessage(
-        from,
-        '🚚 Delivery Method',
-        'How would you like to receive your order?',
-        deliveryButtons
-      );
-      
-      session.step = 'delivery_choice';
-      sessions[from] = session;
-      return res.sendStatus(200);
-    }
-    
-    if (buttonId === 'delivery_ship') {
-      session.delivery_type = 'ship';
-      const shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-      session.shipping = shipping;
-      
-      // Ask for discount code
-      const discountButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'have_discount',
-            title: '🎟️ I have a discount code'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'no_discount',
-            title: '❌ No discount code'
-          }
-        }
-      ];
-      
-      await sendInteractiveMessage(
-        from,
-        '🎟️ Discount Code',
-        'Do you have a discount code you\'d like to apply?',
-        discountButtons
-      );
-      
-      session.step = 'discount_choice';
-      sessions[from] = session;
-      return res.sendStatus(200);
-    }
-    
-    if (buttonId === 'delivery_pickup') {
-      session.delivery_type = 'pickup';
-      session.shipping = 0;
-      session.address = {
-        line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
-        city: 'Coimbatore',
-        state: 'TN',
-        pincode: '641035',
-        country: 'India'
-      };
-      
-      // Ask for discount code
-      const discountButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'have_discount',
-            title: '🎟️ I have a discount code'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'no_discount',
-            title: '❌ No discount code'
-          }
-        }
-      ];
-      
-      await sendInteractiveMessage(
-        from,
-        '🎟️ Discount Code',
-        'Do you have a discount code you\'d like to apply?',
-        discountButtons
-      );
-      
-      session.step = 'discount_choice';
-      sessions[from] = session;
-      return res.sendStatus(200);
-    }
-    
-    if (buttonId === 'have_discount') {
-      session.step = 'discount_code_input';
-      await sendMessage(from, '🎟️ Please enter your discount code:');
-      sessions[from] = session;
-      return res.sendStatus(200);
-    }
-    
-    if (buttonId === 'no_discount') {
-      session.discount_code = '';
-      session.discount_value = 0;
-      session.totalWithShipping = session.total + session.shipping;
-      
-      // Generate order summary and payment
-      const confirmButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'confirm_payment',
-            title: '💳 Proceed to Payment'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'cancel_order',
-            title: '❌ Cancel Order'
-          }
-        }
-      ];
-      
-      await sendInteractiveMessage(
-        from,
-        '✅ Order Summary',
-        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
-        confirmButtons
-      );
-      
-      sessions[from] = session;
-      return res.sendStatus(200);
-    }
-    
-    if (buttonId === 'use_address') {
-      session.address = { ...session.foundAddress };
-      const shipping = session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-      session.shipping = shipping;
-      session.totalWithShipping = session.total + shipping;
-
-      // Debug session data before sending confirmation
-      console.log('Session data after flow response:', {
-        name: session.name,
-        email: session.email,
-        mobile: session.mobile,
-        total: session.total,
-        shipping: session.shipping,
-        totalWithShipping: session.totalWithShipping
-      });
-
-      // Send confirmation with payment
-      const confirmButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'confirm_payment',
-            title: '💳 Proceed to Payment'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'cancel_order',
-            title: '❌ Cancel Order'
-          }
-        }
-      ];
-
-      await sendInteractiveMessage(
-        from,
-        '✅ Order Confirmation',
-        `Total: ₹${session.total}\nShipping: ₹${shipping}\n*Grand Total: ₹${session.totalWithShipping}*`,
-        confirmButtons
-      );
-      
-      sessions[from] = session;
-    } else if (buttonId === 'new_address') {
-      session.step = 'address_line';
-      await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
-      sessions[from] = session;
-    } else if (buttonId === 'retry_discount') {
-      // If this session was created by a Flow, re-trigger the Flow UI
-      if (session.cart && session.total) {
-        // Re-send the Flow for discount code entry
-        const flowData = {
-          cart_summary: session.cart_summary || '', // or reconstruct from session.cart
-          total_amount: session.total.toString(),
-          currency: session.currency || 'INR',
-          name: session.name,
-          email: session.email,
-          mobile: session.mobile,
-          address: session.address?.line,
-          city: session.address?.city,
-          state: session.address?.state,
-          pincode: session.address?.pincode,
-          delivery_type: session.delivery_type,
-        };
-        await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-      } else {
-        // Fallback to text-based
-        session.step = 'discount_input';
-        await sendMessage(from, '🎟️ Please enter your discount code:');
-        sessions[from] = session;
-      }
-    } else if (buttonId === 'skip_discount') {
-      // Skip discount and proceed to payment
-      session.discount_code = '';
-      session.discount_value = 0;
-      session.totalWithShipping = session.total + session.shipping;
-      sessions[from] = session;
-
-      const confirmButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'confirm_payment',
-            title: '💳 Proceed to Payment'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'cancel_order',
-            title: '❌ Cancel Order'
-          }
-        }
-      ];
-
-      await sendInteractiveMessage(
-        from,
-        '✅ Order Summary',
-        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
-        confirmButtons
-      );
-    }
-  }
-
   res.sendStatus(200);
 });
+
+// Helper function to generate order summary
+async function generateOrderSummary(phone, session) {
+  // Set up address based on delivery type and selected address
+  if (session.delivery_type === 'pickup') {
+    session.address = {
+      line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
+      city: 'Coimbatore',
+      state: 'TN',
+      pincode: '641035',
+      country: 'India'
+    };
+    session.shipping = 0;
+  } else {
+    if (session.selectedAddress) {
+      session.address = {
+        line: session.selectedAddress.address1,
+        city: session.selectedAddress.city,
+        state: session.selectedAddress.province,
+        pincode: session.selectedAddress.zip,
+        country: session.selectedAddress.country || 'India'
+      };
+    }
+    session.shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+  }
+
+  // Handle discount code
+  let discountAmount = 0;
+  let discountMsg = '';
+  if (session.discount_code) {
+    const discountRes = await validateDiscountCode(session.discount_code, session.total);
+    if (discountRes.valid) {
+      discountAmount = discountRes.amount;
+      session.discount_value = discountAmount;
+      discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
+    } else {
+      session.discount_value = 0;
+      discountMsg = `\n❌ Discount code invalid or expired.`;
+    }
+  } else {
+    session.discount_value = 0;
+  }
+
+  session.totalWithShipping = session.total + session.shipping - discountAmount;
+  if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+  sessions[phone] = session;
+
+  // Send confirmation with payment
+  const confirmButtons = [
+    {
+      type: 'reply',
+      reply: {
+        id: 'confirm_payment',
+        title: '💳 Proceed to Payment'
+      }
+    },
+    {
+      type: 'reply',
+      reply: {
+        id: 'cancel_order',
+        title: '❌ Cancel Order'
+      }
+    }
+  ];
+
+  await sendInteractiveMessage(
+    phone,
+    '✅ Order Summary',
+    `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
+    confirmButtons
+  );
+}
 
 // Enhanced health check with activity info
 app.get('/api/health', (req, res) => {
@@ -1790,25 +1582,6 @@ app.post('/razorpay-webhook', express.json(), async (req, res) => {
   }
 
   res.sendStatus(400);
-});
-
-// Pincode validation endpoint for flow.json integration
-app.get('/api/pincode/:pincode', async (req, res) => {
-  const { pincode } = req.params;
-  try {
-    const response = await axios.get(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = response.data?.[0]?.PostOffice?.[0];
-    if (data) {
-      res.json({
-        city: data.District,
-        state: data.State
-      });
-    } else {
-      res.status(404).json({ error: 'Invalid pincode' });
-    }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch pincode details' });
-  }
 });
 
 // Graceful shutdown
