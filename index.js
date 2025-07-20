@@ -320,14 +320,11 @@ const sendMessage = async (phone, message) => {
 async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
   try {
     console.log(`Searching for customer with ${isEmail ? 'email' : 'phone'}: ${phoneOrEmail}`);
-    
     let customers = [];
-    
     if (isEmail) {
       // Search by email
       const searchQuery = `email:${phoneOrEmail}`;
       console.log('Email search query:', searchQuery);
-      
       const customerSearchRes = await axios.get(
         `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=${encodeURIComponent(searchQuery)}`,
         {
@@ -339,18 +336,14 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
       // Search by phone - try multiple formats
       const cleanPhone = phoneOrEmail.replace(/\D/g, '');
       console.log('Clean phone number:', cleanPhone);
-      
       const phoneFormats = [
         cleanPhone,
         `+91${cleanPhone}`,
         `91${cleanPhone}`,
         `+${cleanPhone}`
       ];
-      
-      // Try each phone format until we find customers
       for (const phoneFormat of phoneFormats) {
         console.log(`Trying phone format: ${phoneFormat}`);
-        
         try {
           const customerSearchRes = await axios.get(
             `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(phoneFormat)}`,
@@ -358,12 +351,10 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
               headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
             }
           );
-          
           customers = customerSearchRes.data.customers;
           console.log(`Found ${customers.length} customers with phone format: ${phoneFormat}`);
-          
           if (customers.length > 0) {
-            break; // Found customers, stop trying other formats
+            break;
           }
         } catch (err) {
           console.log(`Phone format ${phoneFormat} failed:`, err.message);
@@ -371,54 +362,47 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
         }
       }
     }
-
     console.log('Found customers:', customers.length);
-    
     if (customers.length === 0) {
       return [];
     }
-    
-    // Get the first customer (or you could handle multiple customers)
     const customer = customers[0];
     console.log('Customer data:', JSON.stringify(customer, null, 2));
-    
-    // Get customer's addresses
+    // Set session.customerId, name, email, mobile for later use
+    // This will be set in the calling handler after getCustomerAddresses returns
     const addressesRes = await axios.get(
       `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
       {
         headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
       }
     );
-    
     const addresses = addressesRes.data.addresses;
     console.log('Customer addresses:', JSON.stringify(addresses, null, 2));
-    
-    // Combine default address with other addresses
     let allAddresses = [];
-    
-    // Add default address if it exists
     if (customer.default_address) {
       allAddresses.push({
         ...customer.default_address,
         isDefault: true,
-        customer_name: customer.first_name || customer.last_name || 'Customer'
+        customer_name: customer.first_name || customer.last_name || 'Customer',
+        customer_email: customer.email || '',
+        customer_phone: customer.phone || ''
       });
     }
-    
-    // Add other addresses (avoid duplicates)
     addresses.forEach(addr => {
       const isDuplicate = allAddresses.some(existing => existing.id === addr.id);
       if (!isDuplicate) {
         allAddresses.push({
           ...addr,
           isDefault: false,
-          customer_name: customer.first_name || customer.last_name || 'Customer'
+          customer_name: customer.first_name || customer.last_name || 'Customer',
+          customer_email: customer.email || '',
+          customer_phone: customer.phone || ''
         });
       }
     });
-    
+    // Attach customerId for use in session
+    allAddresses.forEach(addr => { addr.customerId = customer.id; });
     return allAddresses;
-    
   } catch (error) {
     console.error('Error fetching customer addresses:', error.response?.data || error.message);
     return [];
@@ -511,13 +495,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     let shipping = 0;
     if (session.delivery_type === 'pickup') {
       shipping = 0;
-      session.address = {
-        line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
-        city: 'Coimbatore',
-        state: 'TN',
-        pincode: '641035',
-        country: 'India'
-      };
+      // Do NOT overwrite address
     } else {
       shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
     }
@@ -565,7 +543,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
     await sendInteractiveMessage(
       phone,
       '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
+      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
       confirmButtons
     );
   } catch (error) {
@@ -836,7 +814,7 @@ app.post('/webhook', async (req, res) => {
     });
 
     session.total = total;
-    session.cartSummary = summary; // Store cart summary in session
+    session.cart_summary = summary; // Store cart summary in session
     session.step = 'address_choice';
     sessions[from] = session;
 
@@ -861,7 +839,7 @@ app.post('/webhook', async (req, res) => {
     await sendInteractiveMessage(
       from,
       '📦 Address Selection',
-      `${session.cartSummary || summary}\n\nWould you like to use an existing address or enter a new one?`,
+      `${session.cart_summary || summary}\n\nWould you like to use an existing address or enter a new one?`,
       addressButtons
     );
     
@@ -903,9 +881,8 @@ app.post('/webhook', async (req, res) => {
 
     // Handle mobile number input for address lookup
     if (session.step === 'get_mobile_for_address') {
-      const mobile = text.replace(/\D/g, ''); // Remove non-digits
+      const mobile = text.replace(/\D/g, '');
       const addresses = await getCustomerAddresses(mobile);
-      
       if (addresses.length === 0) {
         // Ask if they want to check with email
         const emailButtons = [
@@ -936,7 +913,9 @@ app.post('/webhook', async (req, res) => {
         // Single address found
         session.selectedAddress = addresses[0];
         session.name = addresses[0].customer_name;
-        session.mobile = mobile;
+        session.email = addresses[0].customer_email;
+        session.mobile = addresses[0].customer_phone || mobile;
+        session.customerId = addresses[0].customerId;
         
         // Ask for delivery type
         const deliveryButtons = [
@@ -982,7 +961,6 @@ app.post('/webhook', async (req, res) => {
     if (session.step === 'get_email_for_address') {
       const email = text.trim();
       const addresses = await getCustomerAddresses(email, true);
-      
       if (addresses.length === 0) {
         // No addresses found, send to flow
         await sendMessage(from, '❌ No addresses found for this email address. Please fill out your address details:');
@@ -1004,7 +982,9 @@ app.post('/webhook', async (req, res) => {
         // Single address found
         session.selectedAddress = addresses[0];
         session.name = addresses[0].customer_name;
-        session.email = email;
+        session.email = addresses[0].customer_email || email;
+        session.mobile = addresses[0].customer_phone;
+        session.customerId = addresses[0].customerId;
         
         // Ask for delivery type
         const deliveryButtons = [
@@ -1053,6 +1033,9 @@ app.post('/webhook', async (req, res) => {
         const address = session.availableAddresses[addressIndex];
         session.selectedAddress = address;
         session.name = address.customer_name;
+        session.email = address.customer_email;
+        session.mobile = address.customer_phone;
+        session.customerId = address.customerId;
         
         // Ask for delivery type
         const deliveryButtons = [
@@ -1193,25 +1176,19 @@ app.post('/webhook', async (req, res) => {
 // Helper function to generate order summary
 async function generateOrderSummary(phone, session) {
   // Set up address based on delivery type and selected address
-  if (session.delivery_type === 'pickup') {
+  if (session.selectedAddress) {
     session.address = {
-      line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
-      city: 'Coimbatore',
-      state: 'TN',
-      pincode: '641035',
-      country: 'India'
+      line: session.selectedAddress.address1,
+      city: session.selectedAddress.city,
+      state: session.selectedAddress.province,
+      pincode: session.selectedAddress.zip,
+      country: session.selectedAddress.country || 'India'
     };
+  }
+  if (session.delivery_type === 'pickup') {
+    // For pickup, DO NOT overwrite address, just set shipping to 0
     session.shipping = 0;
   } else {
-    if (session.selectedAddress) {
-      session.address = {
-        line: session.selectedAddress.address1,
-        city: session.selectedAddress.city,
-        state: session.selectedAddress.province,
-        pincode: session.selectedAddress.zip,
-        country: session.selectedAddress.country || 'India'
-      };
-    }
     session.shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
   }
 
@@ -1257,7 +1234,7 @@ async function generateOrderSummary(phone, session) {
   await sendInteractiveMessage(
     phone,
     '✅ Order Summary',
-    `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
+    `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
     confirmButtons
   );
 }
