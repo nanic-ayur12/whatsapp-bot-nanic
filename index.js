@@ -317,90 +317,111 @@ const sendMessage = async (phone, message) => {
 };
 
 // Helper function to get customer addresses from Shopify
-async function getCustomerAddresses(searchValue, searchType = 'phone') {
+async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
   try {
-    let searchQuery;
-    if (searchType === 'phone') {
-      // Remove any non-digit characters and ensure it starts with country code
-      const cleanPhone = searchValue.replace(/\D/g, '');
-      const phoneWithCode = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-      searchQuery = `phone:+${phoneWithCode}`;
+    console.log(`Searching for customer with ${isEmail ? 'email' : 'phone'}: ${phoneOrEmail}`);
+    
+    let customers = [];
+    
+    if (isEmail) {
+      // Search by email
+      const searchQuery = `email:${phoneOrEmail}`;
+      console.log('Email search query:', searchQuery);
+      
+      const customerSearchRes = await axios.get(
+        `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=${encodeURIComponent(searchQuery)}`,
+        {
+          headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
+        }
+      );
+      customers = customerSearchRes.data.customers;
     } else {
-      searchQuery = `email:${searchValue}`;
-    }
-
-    console.log('Searching customers with query:', searchQuery);
-
-    const customerSearchRes = await axios.get(
-      `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=${encodeURIComponent(searchQuery)}`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-        },
+      // Search by phone - try multiple formats
+      const cleanPhone = phoneOrEmail.replace(/\D/g, '');
+      console.log('Clean phone number:', cleanPhone);
+      
+      const phoneFormats = [
+        cleanPhone,
+        `+91${cleanPhone}`,
+        `91${cleanPhone}`,
+        `+${cleanPhone}`
+      ];
+      
+      // Try each phone format until we find customers
+      for (const phoneFormat of phoneFormats) {
+        console.log(`Trying phone format: ${phoneFormat}`);
+        
+        try {
+          const customerSearchRes = await axios.get(
+            `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(phoneFormat)}`,
+            {
+              headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
+            }
+          );
+          
+          customers = customerSearchRes.data.customers;
+          console.log(`Found ${customers.length} customers with phone format: ${phoneFormat}`);
+          
+          if (customers.length > 0) {
+            break; // Found customers, stop trying other formats
+          }
+        } catch (err) {
+          console.log(`Phone format ${phoneFormat} failed:`, err.message);
+          continue;
+        }
       }
-    );
-
-    const customers = customerSearchRes.data.customers;
-    console.log('Found customers:', customers.length);
-
-    if (customers.length === 0) {
-      return { success: false, addresses: [] };
     }
 
+    console.log('Found customers:', customers.length);
+    
+    if (customers.length === 0) {
+      return [];
+    }
+    
+    // Get the first customer (or you could handle multiple customers)
     const customer = customers[0];
     console.log('Customer data:', JSON.stringify(customer, null, 2));
-
-    // Get customer addresses
+    
+    // Get customer's addresses
     const addressesRes = await axios.get(
       `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
       {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-        },
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
       }
     );
-
-    const addresses = addressesRes.data.addresses;
-    console.log('Raw addresses from Shopify:', JSON.stringify(addresses, null, 2));
-
-    // Process addresses and include default address from customer object
-    const processedAddresses = [];
     
-    // Add default address from customer object if it exists
+    const addresses = addressesRes.data.addresses;
+    console.log('Customer addresses:', JSON.stringify(addresses, null, 2));
+    
+    // Combine default address with other addresses
+    let allAddresses = [];
+    
+    // Add default address if it exists
     if (customer.default_address) {
-      console.log('Default address from customer:', JSON.stringify(customer.default_address, null, 2));
-      processedAddresses.push({
+      allAddresses.push({
         ...customer.default_address,
-        isDefault: true
+        isDefault: true,
+        customer_name: customer.first_name || customer.last_name || 'Customer'
       });
     }
-
-    // Add other addresses, avoiding duplicates
+    
+    // Add other addresses (avoid duplicates)
     addresses.forEach(addr => {
-      const isDuplicate = processedAddresses.some(existing => 
-        existing.id === addr.id
-      );
-      
+      const isDuplicate = allAddresses.some(existing => existing.id === addr.id);
       if (!isDuplicate) {
-        processedAddresses.push({
+        allAddresses.push({
           ...addr,
-          isDefault: false
+          isDefault: false,
+          customer_name: customer.first_name || customer.last_name || 'Customer'
         });
       }
     });
-
-    console.log('Processed addresses:', JSON.stringify(processedAddresses, null, 2));
-
-    return {
-      success: true,
-      addresses: processedAddresses,
-      customerId: customer.id,
-      customerName: customer.first_name || customer.last_name || 'Customer'
-    };
-
+    
+    return allAddresses;
+    
   } catch (error) {
     console.error('Error fetching customer addresses:', error.response?.data || error.message);
-    return { success: false, addresses: [] };
+    return [];
   }
 }
 
@@ -597,19 +618,19 @@ app.post('/webhook', async (req, res) => {
         break;
 
       case 'enter_new_address':
-        // Send flow for new address entry
+        // Send to flow for new address
         if (FLOW_IDS.CHECKOUT) {
           const flowData = {
-            cart_summary: session.cartSummary,
-            total_amount: session.total.toString(),
+            cart_summary: session.cartSummary || '',
+            total_amount: session.total ? session.total.toString() : '0',
             currency: 'INR'
           };
+          
           await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
         } else {
           // Fallback to traditional method
-          session.step = 'name';
-          await sendMessage(from, '🧾 Please enter your *Name*');
-          sessions[from] = session;
+          session.step = 'address_line';
+          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
         }
         break;
 
@@ -620,19 +641,19 @@ app.post('/webhook', async (req, res) => {
         break;
 
       case 'no_email_check':
-        // Send flow for new address entry
+        // Send to flow for new address
         if (FLOW_IDS.CHECKOUT) {
           const flowData = {
-            cart_summary: session.cartSummary,
-            total_amount: session.total.toString(),
+            cart_summary: session.cartSummary || '',
+            total_amount: session.total ? session.total.toString() : '0',
             currency: 'INR'
           };
+          
           await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
         } else {
           // Fallback to traditional method
-          session.step = 'name';
-          await sendMessage(from, '🧾 Please enter your *Name*');
-          sessions[from] = session;
+          session.step = 'address_line';
+          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
         }
         break;
 
@@ -840,7 +861,7 @@ app.post('/webhook', async (req, res) => {
     await sendInteractiveMessage(
       from,
       '📦 Address Selection',
-      `${summary}\n\nWould you like to use an existing address or enter a new one?`,
+      `${session.cartSummary || summary}\n\nWould you like to use an existing address or enter a new one?`,
       addressButtons
     );
     
@@ -883,57 +904,10 @@ app.post('/webhook', async (req, res) => {
     // Handle mobile number input for address lookup
     if (session.step === 'get_mobile_for_address') {
       const mobile = text.replace(/\D/g, ''); // Remove non-digits
-      const { customer, addresses } = await getCustomerAddresses('phone', mobile);
+      const addresses = await getCustomerAddresses(mobile);
       
-      if (addresses.length > 0) {
-        session.customer = customer;
-        session.availableAddresses = addresses;
-        
-        if (addresses.length === 1) {
-          // Only one address, use it directly
-          const address = addresses[0];
-          session.selectedAddress = address;
-          session.name = address.name || customer.first_name || '';
-          session.email = customer.email || '';
-          session.mobile = mobile;
-          
-          // Ask for delivery type
-          const deliveryButtons = [
-            {
-              type: 'reply',
-              reply: {
-                id: 'delivery_ship',
-                title: '🚚 Ship'
-              }
-            },
-            {
-              type: 'reply',
-              reply: {
-                id: 'delivery_pickup',
-                title: '🏪 Pickup'
-              }
-            }
-          ];
-
-          await sendInteractiveMessage(
-            from,
-            '🚚 Delivery Method',
-            `Address found:\n${formatAddress(address, 1)}\n\nHow would you like to receive your order?`,
-            deliveryButtons
-          );
-        } else {
-          // Multiple addresses, let user choose
-          let addressList = 'Multiple addresses found. Please reply with the number of your preferred address:\n\n';
-          addresses.forEach((addr, index) => {
-            addressList += formatAddress(addr, index + 1) + '\n\n';
-          });
-          
-          session.step = 'select_address_number';
-          await sendMessage(from, addressList);
-        }
-        sessions[from] = session;
-      } else {
-        // No addresses found for mobile, ask if they want to check email
+      if (addresses.length === 0) {
+        // Ask if they want to check with email
         const emailButtons = [
           {
             type: 'reply',
@@ -950,85 +924,125 @@ app.post('/webhook', async (req, res) => {
             }
           }
         ];
+        
+        await sendInteractiveMessage(
+          from,
+          '📱 No Address Found',
+          '❌ No addresses found for this mobile number.\n\nWould you like to check using your email address instead?',
+          emailButtons
+        );
+        session.step = 'ask_email_check';
+      } else if (addresses.length === 1) {
+        // Single address found
+        session.selectedAddress = addresses[0];
+        session.name = addresses[0].customer_name;
+        session.mobile = mobile;
+        
+        // Ask for delivery type
+        const deliveryButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'delivery_ship',
+              title: '🚚 Ship'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'delivery_pickup',
+              title: '🏪 Pickup'
+            }
+          }
+        ];
 
         await sendInteractiveMessage(
           from,
-          '📍 No Address Found',
-          'No existing address found for this mobile number. Would you like to check with your email address instead?',
-          emailButtons
+          '🚚 Delivery Method',
+          `Address found:\n${formatAddress(addresses[0], 1)}\n\nHow would you like to receive your order?`,
+          deliveryButtons
         );
-        sessions[from] = session;
+      } else {
+        // Multiple addresses found
+        let addressList = 'Multiple addresses found. Please reply with the number of your preferred address:\n\n';
+        addresses.forEach((addr, index) => {
+          addressList += formatAddress(addr, index + 1) + '\n\n';
+        });
+        
+        session.availableAddresses = addresses;
+        session.step = 'select_address_number';
+        await sendMessage(from, addressList);
       }
+      
+      sessions[from] = session;
       return res.sendStatus(200);
     }
 
     // Handle email input for address lookup
     if (session.step === 'get_email_for_address') {
       const email = text.trim();
-      const { customer, addresses } = await getCustomerAddresses('email', email);
+      const addresses = await getCustomerAddresses(email, true);
       
-      if (addresses.length > 0) {
-        session.customer = customer;
-        session.availableAddresses = addresses;
+      if (addresses.length === 0) {
+        // No addresses found, send to flow
+        await sendMessage(from, '❌ No addresses found for this email address. Please fill out your address details:');
         
-        if (addresses.length === 1) {
-          // Only one address, use it directly
-          const address = addresses[0];
-          session.selectedAddress = address;
-          session.name = address.name || customer.first_name || '';
-          session.email = email;
-          session.mobile = address.phone || '';
-          
-          // Ask for delivery type
-          const deliveryButtons = [
-            {
-              type: 'reply',
-              reply: {
-                id: 'delivery_ship',
-                title: '🚚 Ship'
-              }
-            },
-            {
-              type: 'reply',
-              reply: {
-                id: 'delivery_pickup',
-                title: '🏪 Pickup'
-              }
-            }
-          ];
-
-          await sendInteractiveMessage(
-            from,
-            '🚚 Delivery Method',
-            `Address found:\n${formatAddress(address, 1)}\n\nHow would you like to receive your order?`,
-            deliveryButtons
-          );
-        } else {
-          // Multiple addresses, let user choose
-          let addressList = 'Multiple addresses found. Please reply with the number of your preferred address:\n\n';
-          addresses.forEach((addr, index) => {
-            addressList += formatAddress(addr, index + 1) + '\n\n';
-          });
-          
-          session.step = 'select_address_number';
-          await sendMessage(from, addressList);
-        }
-        sessions[from] = session;
-      } else {
-        // No addresses found for email either, proceed with new address
         if (FLOW_IDS.CHECKOUT) {
           const flowData = {
-            cart_summary: session.cartSummary,
-            total_amount: session.total.toString(),
+            cart_summary: session.cartSummary || '',
+            total_amount: session.total ? session.total.toString() : '0',
             currency: 'INR'
           };
+          
           await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
         } else {
-          session.step = 'name';
-          await sendMessage(from, '📍 No existing address found. Please enter your *Name*:');
-          sessions[from] = session;
+          // Fallback to traditional method
+          session.step = 'address_line';
+          await sendMessage(from, '🏠 Please enter your *Address* (Ex: No 1, Anna Street, Ganapathy Taluk)');
         }
+      } else if (addresses.length === 1) {
+        // Single address found
+        session.selectedAddress = addresses[0];
+        session.name = addresses[0].customer_name;
+        session.email = email;
+        
+        // Ask for delivery type
+        const deliveryButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'delivery_ship',
+              title: '🚚 Ship'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'delivery_pickup',
+              title: '🏪 Pickup'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '🚚 Delivery Method',
+          `Address found:\n${formatAddress(addresses[0], 1)}\n\nHow would you like to receive your order?`,
+          deliveryButtons
+        );
+      } else {
+        // Multiple addresses found
+        let addressList = 'Multiple addresses found. Please reply with the number of your preferred address:\n\n';
+        addresses.forEach((addr, index) => {
+          addressList += formatAddress(addr, index + 1) + '\n\n';
+        });
+        
+        session.availableAddresses = addresses;
+        session.step = 'select_address_number';
+        await sendMessage(from, addressList);
       }
+      
+      sessions[from] = session;
       return res.sendStatus(200);
     }
 
@@ -1038,9 +1052,7 @@ app.post('/webhook', async (req, res) => {
       if (addressIndex >= 0 && addressIndex < session.availableAddresses.length) {
         const address = session.availableAddresses[addressIndex];
         session.selectedAddress = address;
-        session.name = address.name || session.customer.first_name || '';
-        session.email = session.customer.email || '';
-        session.mobile = address.phone || '';
+        session.name = address.customer_name;
         
         // Ask for delivery type
         const deliveryButtons = [
