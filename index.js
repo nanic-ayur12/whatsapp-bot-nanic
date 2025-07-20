@@ -126,6 +126,89 @@ app.get("/webhook", (req, res) => {
   res.sendStatus(403);
 });
 
+// Send Catalog Message
+const sendCatalogMessage = async (phone) => {
+  updateActivity();
+  
+  try {
+    // Send native WhatsApp catalog message
+    const message = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: phone,
+      type: 'interactive',
+      interactive: {
+        type: 'catalog_message', 
+        body: {
+          text: '🛍️ Browse our complete product catalog below. Select items and quantities, then click "Send" to place your order.'
+        },
+        footer: {
+          text: 'Nanic Ayurveda'
+        },
+        action: {
+          name: 'catalog_message'
+        }
+      }
+    };
+
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
+      message,
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+
+    console.log('Native catalog message sent successfully');
+  } catch (error) {
+    console.error('Failed to send catalog message:', error.response?.data || error.message);
+    
+    // Fallback: Try single product message to trigger catalog
+    try {
+      const fallbackMessage = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: phone,
+        type: 'interactive',
+        interactive: {
+          type: 'product',
+          body: {
+            text: '🛍️ View our product catalog'
+          },
+          footer: {
+            text: 'Nanic Ayurveda'
+          },
+          action: {
+            catalog_id: process.env.WHATSAPP_CATALOG_ID || '',
+            product_retailer_id: '41392567746606' // Your first product ID
+          }
+        }
+      };
+
+      await axios.post(
+        `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
+        fallbackMessage,
+        {
+          headers: {
+            Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+      
+      console.log('Fallback product message sent');
+    } catch (fallbackError) {
+      console.error('Fallback product message also failed:', fallbackError.response?.data || fallbackError.message);
+      
+      // Final fallback to text message
+      await sendMessage(phone, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
+    }
+  }
+};
+
 // Send Flow Message
 const sendFlowMessage = async (phone, flowId, flowData = {}) => {
   updateActivity();
