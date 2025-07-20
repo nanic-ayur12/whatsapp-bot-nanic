@@ -451,7 +451,7 @@ app.post('/webhook', async (req, res) => {
           const orderMsg = `🧾 Your recent order is already being processed.\n\n*ORDER ID:* ${session.lastOrder.name}\n*ORDER DATE:* ${new Date(session.lastOrder.date).toLocaleDateString()}\n*STATUS:* ${session.lastOrder.status}\n\nIf you want to place another order, message *New*.`;
           await sendMessage(from, orderMsg);
         } else {
-          await sendCatalogMessage(from);
+          await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
         }
         handled = true;
         break;
@@ -461,52 +461,6 @@ app.post('/webhook', async (req, res) => {
         sessions[from] = session;
         handled = true;
         break;
-      case 'existing_address':
-        session.step = 'get_mobile_for_address';
-        await sendMessage(from, '📱 Please enter your *Mobile Number* to check for existing addresses:');
-        sessions[from] = session;
-        break;
-        
-      case 'new_address':
-        // Send flow for new address
-        if (FLOW_IDS.CHECKOUT) {
-          const flowData = {
-            cart_summary: session.cartSummary || '',
-            total_amount: session.total ? session.total.toString() : '0',
-            currency: 'INR'
-          };
-          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-        } else {
-          // Fallback to traditional method
-          session.step = 'name';
-          await sendMessage(from, '👤 Please enter your *Name*:');
-          sessions[from] = session;
-        }
-        break;
-        
-      case 'check_email':
-        session.step = 'get_email_for_address';
-        await sendMessage(from, '📧 Please enter your *Email Address* to check for existing addresses:');
-        sessions[from] = session;
-        break;
-        
-      case 'no_email_check':
-        // Send flow for new address
-        if (FLOW_IDS.CHECKOUT) {
-          const flowData = {
-            cart_summary: session.cartSummary || '',
-            total_amount: session.total ? session.total.toString() : '0',
-            currency: 'INR'
-          };
-          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-        } else {
-          // Fallback to traditional method
-          session.step = 'name';
-          await sendMessage(from, '👤 Please enter your *Name*:');
-          sessions[from] = session;
-        }
-        break;
-        
       case 'confirm_payment':
         session.step = 'payment';
         // Add validation before creating payment link
@@ -1093,6 +1047,168 @@ app.post('/webhook', async (req, res) => {
   // Handle interactive button responses for address selection
   if (type === 'interactive' && msg.interactive?.type === 'button_reply') {
     const buttonId = msg.interactive.button_reply.id;
+    
+    if (buttonId === 'use_selected_address') {
+      // Use the selected existing address
+      const address = session.selectedAddress;
+      session.name = address.name || address.first_name || session.customerData?.first_name || '';
+      session.email = session.customerData?.email || '';
+      session.mobile = address.phone || session.customerData?.phone || '';
+      session.address = {
+        line: address.address1,
+        city: address.city,
+        state: address.province,
+        pincode: address.zip,
+        country: address.country || 'India'
+      };
+      session.customerId = session.customerData?.id;
+      
+      // Ask for delivery type
+      const deliveryButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'delivery_ship',
+            title: '🚚 Ship to Address'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'delivery_pickup',
+            title: '🏪 Pickup from Store'
+          }
+        }
+      ];
+      
+      await sendInteractiveMessage(
+        from,
+        '🚚 Delivery Method',
+        'How would you like to receive your order?',
+        deliveryButtons
+      );
+      
+      session.step = 'delivery_choice';
+      sessions[from] = session;
+      return res.sendStatus(200);
+    }
+    
+    if (buttonId === 'delivery_ship') {
+      session.delivery_type = 'ship';
+      const shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+      session.shipping = shipping;
+      
+      // Ask for discount code
+      const discountButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'have_discount',
+            title: '🎟️ I have a discount code'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'no_discount',
+            title: '❌ No discount code'
+          }
+        }
+      ];
+      
+      await sendInteractiveMessage(
+        from,
+        '🎟️ Discount Code',
+        'Do you have a discount code you\'d like to apply?',
+        discountButtons
+      );
+      
+      session.step = 'discount_choice';
+      sessions[from] = session;
+      return res.sendStatus(200);
+    }
+    
+    if (buttonId === 'delivery_pickup') {
+      session.delivery_type = 'pickup';
+      session.shipping = 0;
+      session.address = {
+        line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
+        city: 'Coimbatore',
+        state: 'TN',
+        pincode: '641035',
+        country: 'India'
+      };
+      
+      // Ask for discount code
+      const discountButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'have_discount',
+            title: '🎟️ I have a discount code'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'no_discount',
+            title: '❌ No discount code'
+          }
+        }
+      ];
+      
+      await sendInteractiveMessage(
+        from,
+        '🎟️ Discount Code',
+        'Do you have a discount code you\'d like to apply?',
+        discountButtons
+      );
+      
+      session.step = 'discount_choice';
+      sessions[from] = session;
+      return res.sendStatus(200);
+    }
+    
+    if (buttonId === 'have_discount') {
+      session.step = 'discount_code_input';
+      await sendMessage(from, '🎟️ Please enter your discount code:');
+      sessions[from] = session;
+      return res.sendStatus(200);
+    }
+    
+    if (buttonId === 'no_discount') {
+      session.discount_code = '';
+      session.discount_value = 0;
+      session.totalWithShipping = session.total + session.shipping;
+      
+      // Generate order summary and payment
+      const confirmButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'confirm_payment',
+            title: '💳 Proceed to Payment'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'cancel_order',
+            title: '❌ Cancel Order'
+          }
+        }
+      ];
+      
+      await sendInteractiveMessage(
+        from,
+        '✅ Order Summary',
+        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
+        confirmButtons
+      );
+      
+      sessions[from] = session;
+      return res.sendStatus(200);
+    }
     
     if (buttonId === 'use_address') {
       session.address = { ...session.foundAddress };
