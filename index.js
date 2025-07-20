@@ -586,14 +586,14 @@ app.post('/webhook', async (req, res) => {
             type: 'reply',
             reply: {
               id: 'yes_discount',
-              title: '✅ Yes, I have one'
+              title: '✅ Yes'
             }
           },
           {
             type: 'reply',
             reply: {
               id: 'no_discount',
-              title: '❌ No discount code'
+              title: '❌ No'
             }
           }
         ];
@@ -616,14 +616,14 @@ app.post('/webhook', async (req, res) => {
             type: 'reply',
             reply: {
               id: 'yes_discount',
-              title: '✅ Yes, I have one'
+              title: '✅ Yes'
             }
           },
           {
             type: 'reply',
             reply: {
               id: 'no_discount',
-              title: '❌ No discount code'
+              title: '❌ No'
             }
           }
         ];
@@ -766,14 +766,14 @@ app.post('/webhook', async (req, res) => {
         type: 'reply',
         reply: {
           id: 'use_existing_address',
-          title: '📋 Use Existing Address'
+          title: '✅ Use Existing'
         }
       },
       {
         type: 'reply',
         reply: {
           id: 'enter_new_address',
-          title: '📝 Enter New Address'
+          title: '📝 Enter New'
         }
       }
     ];
@@ -844,14 +844,14 @@ app.post('/webhook', async (req, res) => {
               type: 'reply',
               reply: {
                 id: 'delivery_ship',
-                title: '🚚 Ship to Address'
+                title: '🚚 Ship'
               }
             },
             {
               type: 'reply',
               reply: {
                 id: 'delivery_pickup',
-                title: '🏪 Pickup from Store'
+                title: '🏪 Pickup'
               }
             }
           ];
@@ -880,14 +880,14 @@ app.post('/webhook', async (req, res) => {
             type: 'reply',
             reply: {
               id: 'check_email_address',
-              title: '📧 Check with Email'
+              title: '✅ Check Email'
             }
           },
           {
             type: 'reply',
             reply: {
               id: 'no_email_check',
-              title: '📝 Enter New Address'
+              title: '❌ Enter New'
             }
           }
         ];
@@ -926,14 +926,14 @@ app.post('/webhook', async (req, res) => {
               type: 'reply',
               reply: {
                 id: 'delivery_ship',
-                title: '🚚 Ship to Address'
+                title: '🚚 Ship'
               }
             },
             {
               type: 'reply',
               reply: {
                 id: 'delivery_pickup',
-                title: '🏪 Pickup from Store'
+                title: '🏪 Pickup'
               }
             }
           ];
@@ -989,14 +989,14 @@ app.post('/webhook', async (req, res) => {
             type: 'reply',
             reply: {
               id: 'delivery_ship',
-              title: '🚚 Ship to Address'
+              title: '🚚 Ship'
             }
           },
           {
             type: 'reply',
             reply: {
               id: 'delivery_pickup',
-              title: '🏪 Pickup from Store'
+              title: '🏪 Pickup'
             }
           }
         ];
