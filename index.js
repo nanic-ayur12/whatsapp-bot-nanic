@@ -316,17 +316,20 @@ const sendMessage = async (phone, message) => {
   );
 };
 
-// Helper: Get customer addresses from Shopify
-async function getCustomerAddresses(searchType, searchValue) {
+// Helper function to get customer addresses from Shopify
+async function getCustomerAddresses(searchValue, searchType = 'phone') {
   try {
     let searchQuery;
     if (searchType === 'phone') {
-      searchQuery = `phone:${searchValue}`;
-    } else if (searchType === 'email') {
-      searchQuery = `email:${searchValue}`;
+      // Remove any non-digit characters and ensure it starts with country code
+      const cleanPhone = searchValue.replace(/\D/g, '');
+      const phoneWithCode = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+      searchQuery = `phone:+${phoneWithCode}`;
     } else {
-      return { customer: null, addresses: [] };
+      searchQuery = `email:${searchValue}`;
     }
+
+    console.log('Searching customers with query:', searchQuery);
 
     const customerSearchRes = await axios.get(
       `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=${encodeURIComponent(searchQuery)}`,
@@ -338,11 +341,16 @@ async function getCustomerAddresses(searchType, searchValue) {
     );
 
     const customers = customerSearchRes.data.customers;
+    console.log('Found customers:', customers.length);
+
     if (customers.length === 0) {
-      return { customer: null, addresses: [] };
+      return { success: false, addresses: [] };
     }
 
     const customer = customers[0];
+    console.log('Customer data:', JSON.stringify(customer, null, 2));
+
+    // Get customer addresses
     const addressesRes = await axios.get(
       `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
       {
@@ -352,19 +360,70 @@ async function getCustomerAddresses(searchType, searchValue) {
       }
     );
 
-    return { 
-      customer: customer, 
-      addresses: addressesRes.data.addresses || [] 
+    const addresses = addressesRes.data.addresses;
+    console.log('Raw addresses from Shopify:', JSON.stringify(addresses, null, 2));
+
+    // Process addresses and include default address from customer object
+    const processedAddresses = [];
+    
+    // Add default address from customer object if it exists
+    if (customer.default_address) {
+      console.log('Default address from customer:', JSON.stringify(customer.default_address, null, 2));
+      processedAddresses.push({
+        ...customer.default_address,
+        isDefault: true
+      });
+    }
+
+    // Add other addresses, avoiding duplicates
+    addresses.forEach(addr => {
+      const isDuplicate = processedAddresses.some(existing => 
+        existing.id === addr.id
+      );
+      
+      if (!isDuplicate) {
+        processedAddresses.push({
+          ...addr,
+          isDefault: false
+        });
+      }
+    });
+
+    console.log('Processed addresses:', JSON.stringify(processedAddresses, null, 2));
+
+    return {
+      success: true,
+      addresses: processedAddresses,
+      customerId: customer.id,
+      customerName: customer.first_name || customer.last_name || 'Customer'
     };
+
   } catch (error) {
     console.error('Error fetching customer addresses:', error.response?.data || error.message);
-    return { customer: null, addresses: [] };
+    return { success: false, addresses: [] };
   }
 }
 
-// Helper: Format address for display
+// Helper function to format address for display
 function formatAddress(address, index) {
-  return `${index}. ${address.name || 'No Name'}\n${address.address1 || ''}\n${address.city || ''}, ${address.province || ''} - ${address.zip || ''}\n${address.country || 'India'}\n📞 ${address.phone || 'No phone'}`;
+  console.log('Formatting address:', JSON.stringify(address, null, 2));
+  
+  const name = address.name || address.first_name || address.last_name || 'No Name';
+  const company = address.company ? `\n${address.company}` : '';
+  const address1 = address.address1 || 'No address line 1';
+  const address2 = address.address2 ? `, ${address.address2}` : '';
+  const city = address.city || 'No city';
+  const province = address.province || address.province_code || 'No state';
+  const zip = address.zip || 'No pincode';
+  const country = address.country || address.country_code || 'India';
+  const phone = address.phone || 'No phone';
+  const defaultText = address.isDefault ? ' (Default)' : '';
+
+  return `${index}. ${name}${defaultText}${company}
+📍 ${address1}${address2}
+🏙️ ${city}, ${province} - ${zip}
+🌍 ${country}
+📞 ${phone}`;
 }
 
 // Helper: Validate discount code with Shopify
@@ -756,7 +815,7 @@ app.post('/webhook', async (req, res) => {
     });
 
     session.total = total;
-    session.cartSummary = summary;
+    session.cartSummary = summary; // Store cart summary in session
     session.step = 'address_choice';
     sessions[from] = session;
 
@@ -781,7 +840,7 @@ app.post('/webhook', async (req, res) => {
     await sendInteractiveMessage(
       from,
       '📦 Address Selection',
-      `${summary}\nWould you like to use an existing address or enter a new one?`,
+      `${summary}\n\nWould you like to use an existing address or enter a new one?`,
       addressButtons
     );
     
