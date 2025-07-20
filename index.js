@@ -451,7 +451,7 @@ app.post('/webhook', async (req, res) => {
           const orderMsg = `🧾 Your recent order is already being processed.\n\n*ORDER ID:* ${session.lastOrder.name}\n*ORDER DATE:* ${new Date(session.lastOrder.date).toLocaleDateString()}\n*STATUS:* ${session.lastOrder.status}\n\nIf you want to place another order, message *New*.`;
           await sendMessage(from, orderMsg);
         } else {
-          await sendMessage(from, '🛍️ You can browse our catalogue here: https://wa.me/c/919682564373. To order, choose the product and quantity from catalog and click place order to proceed to payment.');
+          await sendCatalogMessage(from);
         }
         handled = true;
         break;
@@ -461,6 +461,52 @@ app.post('/webhook', async (req, res) => {
         sessions[from] = session;
         handled = true;
         break;
+      case 'existing_address':
+        session.step = 'get_mobile_for_address';
+        await sendMessage(from, '📱 Please enter your *Mobile Number* to check for existing addresses:');
+        sessions[from] = session;
+        break;
+        
+      case 'new_address':
+        // Send flow for new address
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cartSummary || '',
+            total_amount: session.total ? session.total.toString() : '0',
+            currency: 'INR'
+          };
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        } else {
+          // Fallback to traditional method
+          session.step = 'name';
+          await sendMessage(from, '👤 Please enter your *Name*:');
+          sessions[from] = session;
+        }
+        break;
+        
+      case 'check_email':
+        session.step = 'get_email_for_address';
+        await sendMessage(from, '📧 Please enter your *Email Address* to check for existing addresses:');
+        sessions[from] = session;
+        break;
+        
+      case 'no_email_check':
+        // Send flow for new address
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cartSummary || '',
+            total_amount: session.total ? session.total.toString() : '0',
+            currency: 'INR'
+          };
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        } else {
+          // Fallback to traditional method
+          session.step = 'name';
+          await sendMessage(from, '👤 Please enter your *Name*:');
+          sessions[from] = session;
+        }
+        break;
+        
       case 'confirm_payment':
         session.step = 'payment';
         // Add validation before creating payment link
