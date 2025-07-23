@@ -732,29 +732,33 @@ app.post('/webhook', async (req, res) => {
         break;
 
       case 'retry_discount':
+        session.step = 'discount_input';
+        await sendMessage(from, '🎟️ Please enter your discount code:');
+        sessions[from] = session;
+        break;
         // If this session was created by a Flow, re-trigger the Flow UI
-        if (session.cart && session.total) {
-          // Re-send the Flow for discount code entry
-          const flowData = {
-            cart_summary: session.cart_summary || '', // or reconstruct from session.cart
-            total_amount: session.total.toString(),
-            currency: session.currency || 'INR',
-            name: session.name,
-            email: session.email,
-            mobile: session.mobile,
-            address: session.address?.line,
-            city: session.address?.city,
-            state: session.address?.state,
-            pincode: session.address?.pincode,
-            delivery_type: session.delivery_type,
-          };
-          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-        } else {
-          // Fallback to text-based
-          session.step = 'discount_input';
-          await sendMessage(from, '🎟️ Please enter your discount code:');
-          sessions[from] = session;
-        }
+        // if (session.cart && session.total) {
+        //   // Re-send the Flow for discount code entry
+        //   const flowData = {
+        //     cart_summary: session.cart_summary || '', // or reconstruct from session.cart
+        //     total_amount: session.total.toString(),
+        //     currency: session.currency || 'INR',
+        //     name: session.name,
+        //     email: session.email,
+        //     mobile: session.mobile,
+        //     address: session.address?.line,
+        //     city: session.address?.city,
+        //     state: session.address?.state,
+        //     pincode: session.address?.pincode,
+        //     delivery_type: session.delivery_type,
+        //   };
+        //   await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+        // } else {
+        //   // Fallback to text-based
+        //   session.step = 'discount_input';
+        //   await sendMessage(from, '🎟️ Please enter your discount code:');
+        //   sessions[from] = session;
+        // }
         break;
 
       case 'skip_discount':
