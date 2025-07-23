@@ -329,9 +329,10 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
       const searchQuery = `email:${phoneOrEmail}`;
       console.log('Email search query:', searchQuery);
       const customerSearchRes = await axios.get(
-        `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=${encodeURIComponent(searchQuery)}`,
+        `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json`,
         {
-          headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
+          headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN },
+          params: { searchQuery }
         }
       );
       customers = customerSearchRes.data.customers;
@@ -349,9 +350,10 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
         console.log(`Trying phone format: ${phoneFormat}`);
         try {
           const customerSearchRes = await axios.get(
-            `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${encodeURIComponent(phoneFormat)}`,
+            `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json`,
             {
-              headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN }
+              headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN },
+              params: { phoneFormat }
             }
           );
           customers = customerSearchRes.data.customers;
