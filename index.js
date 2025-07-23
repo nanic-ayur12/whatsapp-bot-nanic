@@ -317,6 +317,9 @@ const sendMessage = async (phone, message) => {
 };
 
 // Helper function to get customer addresses from Shopify
+// SECTION 1: Enhanced logging in getCustomerAddresses function (around line 250-320)
+// Replace the existing getCustomerAddresses function with this updated version:
+
 async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
   try {
     console.log(`Searching for customer with ${isEmail ? 'email' : 'phone'}: ${phoneOrEmail}`);
@@ -362,14 +365,16 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
         }
       }
     }
+    
     console.log('Found customers:', customers.length);
     if (customers.length === 0) {
       return [];
     }
+    
     const customer = customers[0];
     console.log('Customer data:', JSON.stringify(customer, null, 2));
-    // Set session.customerId, name, email, mobile for later use
-    // This will be set in the calling handler after getCustomerAddresses returns
+    
+    // Get customer addresses
     const addressesRes = await axios.get(
       `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/${customer.id}/addresses.json`,
       {
@@ -377,31 +382,40 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
       }
     );
     const addresses = addressesRes.data.addresses;
-    console.log('Customer addresses:', JSON.stringify(addresses, null, 2));
+    console.log('Raw customer addresses from API:', JSON.stringify(addresses, null, 2));
+    
     let allAddresses = [];
+    
+    // Add default address first if it exists
     if (customer.default_address) {
+      console.log('Default address found:', JSON.stringify(customer.default_address, null, 2));
       allAddresses.push({
         ...customer.default_address,
         isDefault: true,
-        customer_name: customer.first_name || customer.last_name || 'Customer',
+        customer_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Customer',
         customer_email: customer.email || '',
-        customer_phone: customer.phone || ''
+        customer_phone: customer.phone || '',
+        customerId: customer.id
       });
     }
+    
+    // Add other addresses
     addresses.forEach(addr => {
+      console.log('Processing address:', JSON.stringify(addr, null, 2));
       const isDuplicate = allAddresses.some(existing => existing.id === addr.id);
       if (!isDuplicate) {
         allAddresses.push({
           ...addr,
           isDefault: false,
-          customer_name: customer.first_name || customer.last_name || 'Customer',
+          customer_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Customer',
           customer_email: customer.email || '',
-          customer_phone: customer.phone || ''
+          customer_phone: customer.phone || '',
+          customerId: customer.id
         });
       }
     });
-    // Attach customerId for use in session
-    allAddresses.forEach(addr => { addr.customerId = customer.id; });
+    
+    console.log('Final processed addresses:', JSON.stringify(allAddresses, null, 2));
     return allAddresses;
   } catch (error) {
     console.error('Error fetching customer addresses:', error.response?.data || error.message);
@@ -409,28 +423,63 @@ async function getCustomerAddresses(phoneOrEmail, isEmail = false) {
   }
 }
 
-// Helper function to format address for display
+// SECTION 2: Fixed formatAddress function (around line 368)
+// Replace the existing formatAddress function with this updated version:
+
 function formatAddress(address, index) {
   console.log('Formatting address:', JSON.stringify(address, null, 2));
   
-  const name = address.name || address.first_name || address.last_name || 'No Name';
-  const company = address.company ? `\n${address.company}` : '';
-  const address1 = address.address1 || 'No address line 1';
-  const address2 = address.address2 ? `, ${address.address2}` : '';
-  const city = address.city || 'No city';
-  const province = address.province || address.province_code || 'No state';
-  const zip = address.zip || 'No pincode';
+  // Handle name - try multiple fields
+  const firstName = address.first_name || address.customer_name?.split(' ')[0] || '';
+  const lastName = address.last_name || address.customer_name?.split(' ')[1] || '';
+  const name = address.name || `${firstName} ${lastName}`.trim() || address.customer_name || 'Customer';
+  
+  // Handle company
+  const company = address.company ? `\n🏢 ${address.company}` : '';
+  
+  // Handle address lines - be more flexible with field names
+  const address1 = address.address1 || address.street || address.line1 || '';
+  const address2 = address.address2 || address.line2 || '';
+  const fullAddress = [address1, address2].filter(Boolean).join(', ') || 'Address not available';
+  
+  // Handle location details
+  const city = address.city || address.locality || '';
+  const province = address.province || address.province_code || address.state || address.region || '';
+  const zip = address.zip || address.postal_code || address.pincode || '';
   const country = address.country || address.country_code || 'India';
-  const phone = address.phone || 'No phone';
-  const defaultText = address.isDefault ? ' (Default)' : '';
+  
+  // Handle phone
+  const phone = address.phone || address.customer_phone || '';
+  
+  // Default indicator
+  const defaultText = address.isDefault ? ' ⭐ (Default)' : '';
 
-  return `${index}. ${name}${defaultText}${company}
-📍 ${address1}${address2}
-🏙️ ${city}, ${province} - ${zip}
-🌍 ${country}
-📞 ${phone}`;
+  // Build the formatted address string
+  let formattedAddress = `${index}. ${name}${defaultText}${company}`;
+  
+  if (fullAddress !== 'Address not available') {
+    formattedAddress += `\n📍 ${fullAddress}`;
+  } else {
+    formattedAddress += `\n📍 Address not available`;
+  }
+  
+  if (city || province || zip) {
+    const locationParts = [city, province, zip].filter(Boolean);
+    if (locationParts.length > 0) {
+      formattedAddress += `\n🏙️ ${locationParts.join(', ')}`;
+    }
+  }
+  
+  if (country) {
+    formattedAddress += `\n🌍 ${country}`;
+  }
+  
+  if (phone) {
+    formattedAddress += `\n📞 ${phone}`;
+  }
+
+  return formattedAddress;
 }
-
 // Helper: Validate discount code with Shopify
 async function validateDiscountCode(code, total) {
   if (!code) return { valid: false };
