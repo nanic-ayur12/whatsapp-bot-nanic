@@ -523,6 +523,129 @@ async function validateDiscountCode(code, total) {
   }
 }
 
+// Proceed with delivery options after address is confirmed
+const proceedWithDeliveryOptions = async (phone) => {
+  const session = sessions[phone];
+  
+  const deliveryButtons = [
+    {
+      type: 'reply',
+      reply: {
+        id: 'delivery_ship',
+        title: '🚚 Ship to Address'
+      }
+    },
+    {
+      type: 'reply',
+      reply: {
+        id: 'delivery_pickup',
+        title: '🏪 Store Pickup'
+      }
+    }
+  ];
+
+  await sendInteractiveMessage(
+    phone,
+    '🚚 Choose Delivery Method',
+    'How would you like to receive your order?',
+    deliveryButtons
+  );
+  
+  session.step = 'delivery_method';
+  sessions[phone] = session;
+};
+
+// Ask for discount code when using saved address
+const askForDiscountCode = async (phone) => {
+  const discountButtons = [
+    {
+      type: 'reply',
+      reply: {
+        id: 'use_discount',
+        title: '🎟️ Yes, I have a code'
+      }
+    },
+    {
+      type: 'reply',
+      reply: {
+        id: 'skip_discount',
+        title: '⏭️ Skip discount'
+      }
+    }
+  ];
+
+  await sendInteractiveMessage(
+    phone,
+    '🎟️ Discount Code',
+    'Do you have a discount code to apply?',
+    discountButtons
+  );
+  
+  const session = sessions[phone];
+  session.step = 'discount_choice';
+  sessions[phone] = session;
+};
+
+// Proceed with order summary and payment
+const proceedWithOrderSummary = async (phone) => {
+  const session = sessions[phone];
+  
+  // Calculate shipping
+  let shipping = 0;
+  if (session.delivery_type === 'pickup') {
+    shipping = 0;
+  } else {
+    shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+  }
+  session.shipping = shipping;
+
+  // Discount code logic
+  let discountAmount = 0;
+  let discountMsg = '';
+  if (session.discount_code) {
+    const discountRes = await validateDiscountCode(session.discount_code, session.total);
+    if (discountRes.valid) {
+      discountAmount = discountRes.amount;
+      session.discount_value = discountAmount;
+      discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
+    } else {
+      session.discount_value = 0;
+      discountMsg = `\n❌ Discount code invalid or expired.`;
+    }
+  } else {
+    session.discount_value = 0;
+  }
+
+  session.totalWithShipping = session.total + shipping - discountAmount;
+  if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+  sessions[phone] = session;
+
+  // Send confirmation with payment
+  const confirmButtons = [
+    {
+      type: 'reply',
+      reply: {
+        id: 'confirm_payment',
+        title: '💳 Proceed to Payment'
+      }
+    },
+    {
+      type: 'reply',
+      reply: {
+        id: 'cancel_order',
+        title: '❌ Cancel Order'
+      }
+    }
+  ];
+
+  await sendInteractiveMessage(
+    phone,
+    '✅ Order Summary',
+    `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
+    confirmButtons
+  );
+};
+
 // Handle Flow Response
 const handleFlowResponse = async (flowResponse, phone) => {
   try {
@@ -530,84 +653,113 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const data = JSON.parse(response_json);
     const session = sessions[phone] || {};
 
-    // Update session with flow data
-    session.name = data.name;
-    session.email = data.email;
-    session.mobile = data.mobile;
-    session.address = {
-      line: data.address,
-      city: data.city,
-      state: data.state,
-      pincode: data.pincode
-    };
-    session.delivery_type = data.delivery_type || 'ship';
-    session.discount_code = data.discount_code || '';
-
-    // Delivery type logic
-    let shipping = 0;
-    if (session.delivery_type === 'pickup') {
-      shipping = 0;
-      // Do NOT overwrite address
+    // Check if this is an address form response
+    if (session.step === 'awaiting_address_flow') {
+      // Update session with flow data
+      session.name = data.name;
+      session.email = data.email;
+      session.mobile = data.mobile;
+      session.address = {
+        line: data.address,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode
+      };
+      
+      // Save address to Firebase
+      const addressData = {
+        name: session.name,
+        email: session.email,
+        mobile: session.mobile,
+        address: session.address.line,
+        city: session.address.city,
+        state: session.address.state,
+        pincode: session.address.pincode
+      };
+      
+      await saveAddressToFirebase(session.mobile, addressData);
+      
+      // Proceed with delivery options
+      await proceedWithDeliveryOptions(phone, session);
+      
     } else {
-      shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-    }
-    session.shipping = shipping;
+      // Handle checkout flow response (original logic)
+      session.name = data.name;
+      session.email = data.email;
+      session.mobile = data.mobile;
+      session.address = {
+        line: data.address,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode
+      };
+      session.delivery_type = data.delivery_type || 'ship';
+      session.discount_code = data.discount_code || '';
 
-    // Discount code logic (same as Code 2)
-    let discountAmount = 0;
-    let discountMsg = '';
-    if (session.discount_code) {
-      const discountRes = await validateDiscountCode(session.discount_code, session.total + shipping);
-      if (discountRes.valid) {
-        discountAmount = discountRes.amount;
-        session.discount_value = discountAmount;
-        discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
+      // Delivery type logic
+      let shipping = 0;
+      if (session.delivery_type === 'pickup') {
+        shipping = 0;
+        session.address = {
+          line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
+          city: 'Coimbatore',
+          state: 'TN',
+          pincode: '641035',
+          country: 'India'
+        };
+      } else {
+        shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+      }
+      session.shipping = shipping;
+
+      // Discount code logic
+      let discountAmount = 0;
+      let discountMsg = '';
+      if (session.discount_code) {
+        const discountRes = await validateDiscountCode(session.discount_code, session.total);
+        if (discountRes.valid) {
+          discountAmount = discountRes.amount;
+          session.discount_value = discountAmount;
+          discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
+        } else {
+          session.discount_value = 0;
+          discountMsg = `\n❌ Discount code invalid or expired.`;
+        }
       } else {
         session.discount_value = 0;
-        // Show retry/skip options
-        const retryButtons = [
-          { type: 'reply', reply: { id: 'retry_discount', title: '🔄 Try Another Code' } },
-          { type: 'reply', reply: { id: 'skip_discount', title: '⏭️ Skip Discount' } }
-        ];
-        await sendInteractiveMessage(phone, '❌ Invalid Discount Code', 
-          `Sorry, the discount code "${session.discount_code}" is invalid or expired.\n\nWould you like to try another discount code?`, 
-          retryButtons);
-        session.step = 'discount_retry';
-        sessions[phone] = session;
-        return;
       }
-    } else {
-      session.discount_value = 0;
+
+      session.totalWithShipping = session.total + shipping - discountAmount;
+      if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+
+      const confirmButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'confirm_payment',
+            title: '💳 Proceed to Payment'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'cancel_order',
+            title: '❌ Cancel Order'
+          }
+        }
+      ];
+
+      const deliveryText = session.delivery_type === 'pickup' ? 'Store Pickup' : `Ship to: ${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`;
+
+      await sendInteractiveMessage(
+        phone,
+        '✅ Order Summary',
+        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\n📍 ${deliveryText}`,
+        confirmButtons
+      );
     }
-
-    session.totalWithShipping = session.total + shipping - discountAmount;
-    if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+    
     sessions[phone] = session;
-
-    // Send confirmation with payment
-    const confirmButtons = [
-      {
-        type: 'reply',
-        reply: {
-          id: 'confirm_payment',
-          title: '💳 Proceed to Payment'
-        }
-      },
-      {
-        type: 'reply',
-        reply: {
-          id: 'cancel_order',
-          title: '❌ Cancel Order'
-        }
-      }
-    ];
-
-    await sendInteractiveMessage(
-      phone,
-      '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
-      confirmButtons
-    );
   } catch (error) {
     console.error('Flow response handling error:', error);
     await sendMessage(phone, '❌ There was an error processing your order. Please try again.');
@@ -664,8 +816,10 @@ app.post('/webhook', async (req, res) => {
         break;
 
       case 'use_saved_address':
-        // Proceed with saved address
-        await proceedWithDeliveryOptions(from, session);
+        session.address = session.foundAddress;
+        session.step = 'address_confirmed';
+        await askForDiscountCode(from);
+        sessions[from] = session;
         break;
         
       case 'edit_saved_address':
@@ -732,6 +886,16 @@ app.post('/webhook', async (req, res) => {
           country: 'India'
         };
         await proceedWithOrderSummary(from, session);
+        break;
+        
+      case 'use_discount':
+        session.step = 'discount_code';
+        await sendMessage(from, '🎟️ Please enter your discount code:');
+        sessions[from] = session;
+        break;
+        
+      case 'skip_discount':
+        await proceedWithDeliveryOptions(from);
         break;
         
       case 'confirm_payment':
@@ -867,22 +1031,13 @@ app.post('/webhook', async (req, res) => {
             }
           }
         ];
-        
-        // Save address to Firebase
-        const addressData = {
-          name: session.name,
-          email: session.email,
-          mobile: session.mobile,
-          address: session.address.line,
-          city: session.address.city,
-          state: session.address.state,
-          pincode: session.address.pincode
-        };
-        
-        await saveAddressToFirebase(session.mobile, addressData);
-        
-        // Proceed with delivery options
-        await proceedWithDeliveryOptions(from, session);
+
+        await sendInteractiveMessage(
+          from,
+          '✅ Order Summary',
+          `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
+          confirmButtonsSkip
+        );
         break;
 
       case 'cancel_order':
@@ -993,12 +1148,14 @@ app.post('/webhook', async (req, res) => {
   const proceedWithOrderSummary = async (phone, session) => {
     // Calculate shipping
     let shipping = 0;
-    if (session.delivery_type === 'ship') {
+    if (session.delivery_type === 'pickup') {
+      shipping = 0;
+    } else {
       shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
     }
     session.shipping = shipping;
 
-    // Calculate discount if any
+    // Discount code logic
     let discountAmount = 0;
     let discountMsg = '';
     if (session.discount_code) {
@@ -1017,7 +1174,9 @@ app.post('/webhook', async (req, res) => {
 
     session.totalWithShipping = session.total + shipping - discountAmount;
     if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+    sessions[phone] = session;
 
+    // Send confirmation with payment
     const confirmButtons = [
       {
         type: 'reply',
@@ -1035,16 +1194,12 @@ app.post('/webhook', async (req, res) => {
       }
     ];
 
-    const deliveryText = session.delivery_type === 'pickup' ? 'Store Pickup' : `Ship to: ${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`;
-
     await sendInteractiveMessage(
       phone,
       '✅ Order Summary',
-      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\n📍 ${deliveryText}`,
+      `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
       confirmButtons
     );
-
-    sessions[phone] = session;
   };
 
   if (type === 'text') {
@@ -1192,6 +1347,26 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // Handle discount code input
+    if (session.step === 'discount_code') {
+      const discountCode = text.trim();
+      session.discount_code = discountCode;
+      
+      // Validate discount code
+      const discountRes = await validateDiscountCode(discountCode, session.total);
+      if (discountRes.valid) {
+        session.discount_value = discountRes.amount;
+        await sendMessage(from, `✅ Discount code "${discountCode}" applied! You saved ₹${discountRes.amount}`);
+      } else {
+        session.discount_value = 0;
+        await sendMessage(from, `❌ Discount code "${discountCode}" is invalid or expired.`);
+      }
+      
+      sessions[from] = session;
+      await proceedWithDeliveryOptions(from);
+      return res.sendStatus(200);
+    }
+
     // Handle traditional checkout flow (fallback when flows are not available)
     switch (session.step) {
       case 'collect_customer_info':
@@ -1243,67 +1418,140 @@ app.post('/webhook', async (req, res) => {
       case 'collect_pincode':
         session.address.pincode = text;
         
-        // Calculate shipping based on state
-        let shipping = 0;
-        if (session.address.state.toLowerCase() === 'tn') {
-          shipping = 40;
-        } else {
-          shipping = 80;
-        }
-        session.shipping = shipping;
+        // Save address to Firebase
+        const addressData = {
+          name: session.name,
+          email: session.email,
+          mobile: session.mobile,
+          address: session.address.line,
+          city: session.address.city,
+          state: session.address.state,
+          pincode: session.address.pincode
+        };
         
-        // Calculate discount if any
-        let discountAmount = 0;
-        let discountMsg = '';
-        if (session.discount_code) {
-          const discountRes = await validateDiscountCode(session.discount_code, session.total);
-          if (discountRes.valid) {
-            discountAmount = discountRes.amount;
-            session.discount_value = discountAmount;
-            discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
-          } else {
-            session.discount_value = 0;
-            discountMsg = `\n❌ Discount code invalid or expired.`;
-          }
-        } else {
-          session.discount_value = 0;
-        }
-
-        session.totalWithShipping = session.total + session.shipping - discountAmount;
-        if (session.totalWithShipping < 0) session.totalWithShipping = 0;
-        sessions[from] = session;
-
-        // Send confirmation with payment
-        const confirmButtons = [
-          {
-            type: 'reply',
-            reply: {
-              id: 'confirm_payment',
-              title: '💳 Proceed to Payment'
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'cancel_order',
-              title: '❌ Cancel Order'
-            }
-          }
-        ];
-
-        await sendInteractiveMessage(
-          from,
-          '✅ Order Summary',
-          `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
-          confirmButtons
-        );
+        await saveAddressToFirebase(session.mobile, addressData);
+        
+        // Proceed with delivery options
+        await proceedWithDeliveryOptions(from, session);
         break;
     }
 
     sessions[from] = session;
   }
 
-  res.sendStatus(200);
+  res.sendStatus(400);
+});
+
+// POST route for Razorpay webhook (for payment processing)
+app.post('/razorpay-webhook', async (req, res) => {
+  updateActivity();
+  
+  console.log('POST /razorpay-webhook accessed with body:', req.body);
+  
+  // Find session by payment link ID or other identifier
+  const phone = Object.keys(sessions).find(key => 
+    sessions[key].paymentLinkId === req.body.payment_link_id
+  );
+
+  if (!phone) return res.sendStatus(404);
+  const session = sessions[phone];
+
+  try {
+    const shippingAddress = {
+      address1: session.address.line,
+      city: session.address.city,
+      province: session.address.state,
+      zip: session.address.pincode,
+      country: "India"
+    };
+
+    const customerSearchRes = await axios.get(
+      `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${phone}`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+        },
+      }
+    );
+
+    let customerId;
+    if (customerSearchRes.data.customers.length > 0) {
+      customerId = customerSearchRes.data.customers[0].id;
+    }
+
+    const orderPayload = {
+      order: {
+        customer: {
+          id: session.customerId
+        },
+        line_items: session.cart.map(item => ({
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+        })),
+        financial_status: "paid",
+        transactions: [
+          {
+            kind: "sale",
+            status: "success",
+            amount: session.totalWithShipping.toString(),
+            gateway: "razorpay"
+          }
+        ],
+        shipping_address: {
+          address1: session.address.line,
+          city: session.address.city,
+          province: session.address.state,
+          zip: session.address.pincode,
+          country: "India",
+          phone: `+91${session.mobile}`,
+          name: session.name
+        },
+        billing_address: {
+          address1: session.address.line,
+          city: session.address.city,
+          province: session.address.state,
+          zip: session.address.pincode,
+          country: "India",
+          phone: `+91${session.mobile}`,
+          name: session.name
+        },
+        shipping_lines: [
+          {
+            title: "Courier",
+            price: session.shipping.toString(),
+            code: "Courier"
+          }
+        ]
+      }
+    };
+
+    const orderRes = await axios.post(
+      `https://${SHOP}.myshopify.com/admin/api/2024-04/orders.json`,
+      orderPayload,
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+
+    const order = orderRes.data.order;
+    session.lastOrder = {
+      name: order.name,
+      date: order.created_at,
+      status: order.fulfillment_status || 'Not fulfilled yet',
+    };
+
+    await sendMessage(phone, `✅ Order placed! 🧾\nOrder ID: *${order.name}*\nThank you for shopping with us!\n\nTo track your order send *Hi*`);
+
+  } catch (err) {
+    console.error('Shopify Error:', err?.response?.data || err.message || err);
+    await sendMessage(phone, `❌ Failed to create your Shopify order.\nError: ${JSON.stringify(err?.response?.data || err.message)}`);
+  }
+
+  delete sessions[phone];
+  return res.sendStatus(200);
 });
 
 // Enhanced health check with activity info
@@ -1560,133 +1808,7 @@ app.get('/payment-success', (req, res) => {
   updateActivity();
   
   // Redirect to the main webhook route
-  res.redirect('/razorpay-webhook' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''));
-});
-
-// Test route to verify webhook page is working
-app.get('/test-payment-success', (req, res) => {
-  console.log('GET /test-payment-success accessed');
-  updateActivity();
-  
-  // Redirect to the main webhook route for testing
-  res.redirect('/razorpay-webhook');
-});
-
-// Razorpay Webhook POST handler
-app.post('/razorpay-webhook', express.json(), async (req, res) => {
-  updateActivity();
-  
-  const event = req.body;
-
-  if (event.event === 'payment_link.paid') {
-    const linkId = event.payload.payment_link.entity.id;
-
-    const phone = Object.keys(sessions).find(
-      key => sessions[key]?.paymentLinkId === linkId
-    );
-
-    if (!phone) return res.sendStatus(404);
-    const session = sessions[phone];
-
-    try {
-      const shippingAddress = {
-        address1: session.address.line,
-        city: session.address.city,
-        province: session.address.state,
-        zip: session.address.pincode,
-        country: "India"
-      };
-
-      const customerSearchRes = await axios.get(
-        `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${phone}`,
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-          },
-        }
-      );
-
-      let customerId;
-      if (customerSearchRes.data.customers.length > 0) {
-        customerId = customerSearchRes.data.customers[0].id;
-      }
-
-      const orderPayload = {
-        order: {
-          customer: {
-            id: session.customerId
-          },
-          line_items: session.cart.map(item => ({
-            variant_id: item.variant_id,
-            quantity: item.quantity,
-          })),
-          financial_status: "paid",
-          transactions: [
-            {
-              kind: "sale",
-              status: "success",
-              amount: session.totalWithShipping.toString(),
-              gateway: "razorpay"
-            }
-          ],
-          shipping_address: {
-            address1: session.address.line,
-            city: session.address.city,
-            province: session.address.state,
-            zip: session.address.pincode,
-            country: "India",
-            phone: `+91${session.mobile}`,
-            name: session.name
-          },
-          billing_address: {
-            address1: session.address.line,
-            city: session.address.city,
-            province: session.address.state,
-            zip: session.address.pincode,
-            country: "India",
-            phone: `+91${session.mobile}`,
-            name: session.name
-          },
-          shipping_lines: [
-            {
-              title: "Courier",
-              price: session.shipping.toString(),
-              code: "Courier"
-            }
-          ]
-        }
-      };
-
-      const orderRes = await axios.post(
-        `https://${SHOP}.myshopify.com/admin/api/2024-04/orders.json`,
-        orderPayload,
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const order = orderRes.data.order;
-      session.lastOrder = {
-        name: order.name,
-        date: order.created_at,
-        status: order.fulfillment_status || 'Not fulfilled yet',
-      };
-
-      await sendMessage(phone, `✅ Order placed! 🧾\nOrder ID: *${order.name}*\nThank you for shopping with us!\n\nTo track your order send *Hi*`);
-
-    } catch (err) {
-      console.error('Shopify Error:', err?.response?.data || err.message || err);
-      await sendMessage(phone, `❌ Failed to create your Shopify order.\nError: ${JSON.stringify(err?.response?.data || err.message)}`);
-    }
-
-    delete sessions[phone];
-    return res.sendStatus(200);
-  }
-
-  res.sendStatus(400);
+  res.redirect(`/razorpay-webhook?${new URLSearchParams(req.query).toString()}`);
 });
 
 // Graceful shutdown
