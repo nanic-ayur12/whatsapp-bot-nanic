@@ -541,6 +541,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
         city: data.city,
         state: data.state,
         pincode: data.pincode
+      };
     // Discount code logic (same as Code 2)
     let discountAmount = 0;
     let discountMsg = '';
@@ -596,6 +597,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
       `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
       confirmButtons
     );
+    }
   } catch (error) {
     console.error('Flow response handling error:', error);
     await sendMessage(phone, '❌ There was an error processing your order. Please try again.');
@@ -854,6 +856,7 @@ app.post('/webhook', async (req, res) => {
               title: '❌ Cancel Order'
             }
           }
+        ];
         
         // Save address to Firebase
         const addressData = {
@@ -980,6 +983,12 @@ app.post('/webhook', async (req, res) => {
   const proceedWithOrderSummary = async (phone, session) => {
     // Calculate shipping
     let shipping = 0;
+    if (session.delivery_type === 'pickup') {
+      shipping = 0;
+    } else {
+      shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+    }
+    session.shipping = shipping;
       
       // Save address to Firebase
       const addressData = {
@@ -1054,6 +1063,7 @@ app.post('/webhook', async (req, res) => {
       '✅ Order Summary',
       `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\n📍 ${deliveryText}`,
       confirmButtons
+    );
       // Discount code logic
       let discountAmount = 0;
       let discountMsg = '';
@@ -1248,50 +1258,35 @@ app.post('/webhook', async (req, res) => {
         break;
 
       case 'collect_address':
-  let discountMsg = '';
-  if (session.discount_code) {
-    const discountRes = await validateDiscountCode(session.discount_code, session.total);
-    if (discountRes.valid) {
-      discountAmount = discountRes.amount;
-      session.discount_value = discountAmount;
-      discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
-    } else {
-      session.discount_value = 0;
-      discountMsg = `\n❌ Discount code invalid or expired.`;
+        session.address = { line: text };
+        session.step = 'collect_city';
+        await sendMessage(from, '🏙️ Please enter your *City*:');
+        break;
+
+      case 'collect_city':
+        session.address.city = text;
+        session.step = 'collect_state';
+        await sendMessage(from, '🗺️ Please enter your *State*:');
+        break;
+
+      case 'collect_state':
+        session.address.state = text;
+        session.step = 'collect_pincode';
+        await sendMessage(from, '📮 Please enter your *Pincode*:');
+        break;
+
+      case 'collect_pincode':
+        session.address.pincode = text;
+        await proceedWithDeliveryOptions(from, session);
+        break;
     }
-  } else {
-    session.discount_value = 0;
+
+    sessions[from] = session;
+    return res.sendStatus(200);
   }
 
-  session.totalWithShipping = session.total + session.shipping - discountAmount;
-  if (session.totalWithShipping < 0) session.totalWithShipping = 0;
-  sessions[phone] = session;
-
-  // Send confirmation with payment
-  const confirmButtons = [
-    {
-      type: 'reply',
-      reply: {
-        id: 'confirm_payment',
-        title: '💳 Proceed to Payment'
-      }
-    },
-    {
-      type: 'reply',
-      reply: {
-        id: 'cancel_order',
-        title: '❌ Cancel Order'
-      }
-    }
-  ];
-
-  await sendInteractiveMessage(
-    phone,
-    '✅ Order Summary',
-    `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${session.shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}\nDelivery Method: ${session.delivery_type === 'pickup' ? '🏪 Pickup from Store' : '🚚 Ship to Address'}`,
-    confirmButtons
-  );
-}
+  res.sendStatus(400);
+});
 
 // Enhanced health check with activity info
 app.get('/api/health', (req, res) => {
@@ -1547,130 +1542,124 @@ app.get('/payment-success', (req, res) => {
   updateActivity();
   
   // Redirect to the main webhook route
-      session.totalWithShipping = session.total + shipping - discountAmount;
-      if (session.totalWithShipping < 0) session.totalWithShipping = 0;
-      
-      // Send confirmation with payment
-      const confirmButtons = [
-        {
-          type: 'reply',
-          reply: {
-            id: 'confirm_payment',
-            title: '💳 Proceed to Payment'
-          }
-        },
-        {
-          type: 'reply',
-          reply: {
-            id: 'cancel_order',
-            title: '❌ Cancel Order'
-          }
-        }
-      ];
+  res.redirect(`/razorpay-webhook?${new URLSearchParams(req.query).toString()}`);
+});
 
-      await sendInteractiveMessage(
-        phone,
-        '✅ Order Summary',
-        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
-        confirmButtons
-      );
+// POST route for Razorpay webhook (for payment status updates)
+app.post('/razorpay-webhook', async (req, res) => {
+  console.log('POST /razorpay-webhook accessed');
+  updateActivity();
+  
+  const { razorpay_payment_link_id, razorpay_payment_id, razorpay_signature } = req.body;
+  
+  // Find session by payment link ID
+  let phone = null;
+  for (const [sessionPhone, sessionData] of Object.entries(sessions)) {
+    if (sessionData.paymentLinkId === razorpay_payment_link_id) {
+      phone = sessionPhone;
+      break;
     }
-    
-    sessions[phone] = session;
-
-    if (!phone) return res.sendStatus(404);
-    const session = sessions[phone];
-
-    try {
-      const shippingAddress = {
-        address1: session.address.line,
-        city: session.address.city,
-        province: session.address.state,
-        zip: session.address.pincode,
-        country: "India"
-      };
-
-      const customerSearchRes = await axios.get(
-        `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${phone}`,
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-          },
-        }
-      );
-
-      let customerId;
-      if (customerSearchRes.data.customers.length > 0) {
-        customerId = customerSearchRes.data.customers[0].id;
-      }
-
-      const orderPayload = {
-        order: {
-          customer: {
-            id: session.customerId
-          },
-          line_items: session.cart.map(item => ({
-            variant_id: item.variant_id,
-            quantity: item.quantity,
-          })),
-          financial_status: "paid",
-          transactions: [
-            {
-              kind: "sale",
-              status: "success",
-              amount: session.totalWithShipping.toString(),
-              gateway: "razorpay"
-            }
-          ],
-          shipping_address: {
-            address1: session.address.line,
-            city: session.address.city,
-            province: session.address.state,
-            zip: session.address.pincode,
-            country: "India",
-            phone: `+91${session.mobile}`,
-            name: session.name
-          },
-        session.step = 'collect_city';
-            address1: session.address.line,
-            city: session.address.city,
-            province: session.address.state,
-      case 'collect_city':
-            country: "India",
-        session.step = 'collect_state';
-            name: session.name
-          },
-          shipping_lines: [
-      case 'collect_state':
-              title: "Courier",
-        session.step = 'collect_pincode';
-              code: "Courier"
-            }
-          ]
-      case 'collect_pincode':
-      };
-        }
-      );
-
-      const order = orderRes.data.order;
-      session.lastOrder = {
-        name: order.name,
-        date: order.created_at,
-        status: order.fulfillment_status || 'Not fulfilled yet',
-      };
-
-      await sendMessage(phone, `✅ Order placed! 🧾\nOrder ID: *${order.name}*\nThank you for shopping with us!\n\nTo track your order send *Hi*`);
-
-    } catch (err) {
-      console.error('Shopify Error:', err?.response?.data || err.message || err);
-      await sendMessage(phone, `❌ Failed to create your Shopify order.\nError: ${JSON.stringify(err?.response?.data || err.message)}`);
-    }
-
-    delete sessions[phone];
-    return res.sendStatus(200);
   }
 
-  res.sendStatus(400);
+  if (!phone) return res.sendStatus(404);
+  const session = sessions[phone];
+
+  try {
+    const shippingAddress = {
+      address1: session.address.line,
+      city: session.address.city,
+      province: session.address.state,
+      zip: session.address.pincode,
+      country: "India"
+    };
+
+    const customerSearchRes = await axios.get(
+      `https://${SHOP}.myshopify.com/admin/api/2024-04/customers/search.json?query=phone:${phone}`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+        },
+      }
+    );
+
+    let customerId;
+    if (customerSearchRes.data.customers.length > 0) {
+      customerId = customerSearchRes.data.customers[0].id;
+    }
+
+    const orderPayload = {
+      order: {
+        customer: {
+          id: session.customerId
+        },
+        line_items: session.cart.map(item => ({
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+        })),
+        financial_status: "paid",
+        transactions: [
+          {
+            kind: "sale",
+            status: "success",
+            amount: session.totalWithShipping.toString(),
+            gateway: "razorpay"
+          }
+        ],
+        shipping_address: {
+          address1: session.address.line,
+          city: session.address.city,
+          province: session.address.state,
+          zip: session.address.pincode,
+          country: "India",
+          phone: `+91${session.mobile}`,
+          name: session.name
+        },
+        billing_address: {
+          address1: session.address.line,
+          city: session.address.city,
+          province: session.address.state,
+          zip: session.address.pincode,
+          country: "India",
+          phone: `+91${session.mobile}`,
+          name: session.name
+        },
+        shipping_lines: [
+          {
+            title: "Courier",
+            price: session.shipping.toString(),
+            code: "Courier"
+          }
+        ]
+      }
+    };
+
+    const orderRes = await axios.post(
+      `https://${SHOP}.myshopify.com/admin/api/2024-04/orders.json`,
+      orderPayload,
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+
+    const order = orderRes.data.order;
+    session.lastOrder = {
+      name: order.name,
+      date: order.created_at,
+      status: order.fulfillment_status || 'Not fulfilled yet',
+    };
+
+    await sendMessage(phone, `✅ Order placed! 🧾\nOrder ID: *${order.name}*\nThank you for shopping with us!\n\nTo track your order send *Hi*`);
+
+  } catch (err) {
+    console.error('Shopify Error:', err?.response?.data || err.message || err);
+    await sendMessage(phone, `❌ Failed to create your Shopify order.\nError: ${JSON.stringify(err?.response?.data || err.message)}`);
+  }
+
+  delete sessions[phone];
+  return res.sendStatus(200);
 });
 
 // Graceful shutdown
