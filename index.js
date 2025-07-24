@@ -2,11 +2,25 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const crypto = require("crypto");
+const { initializeApp } = require('firebase/app');
+const { getFirestore, doc, getDoc, setDoc, collection } = require('firebase/firestore');
 
 require("dotenv").config();
 
 const app = express();
 app.use(bodyParser.json());
+
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 const PORT = process.env.PORT;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
@@ -106,6 +120,39 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+
+// Firebase helper functions
+const getAddressFromFirebase = async (phoneNumber) => {
+  try {
+    const docRef = doc(db, 'addresses', phoneNumber);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return docSnap.data();
+    } else {
+      return null;
+    }
+  } catch (error) {
+    console.error('Error fetching address from Firebase:', error);
+    return null;
+  }
+};
+
+const saveAddressToFirebase = async (phoneNumber, addressData) => {
+  try {
+    const docRef = doc(db, 'addresses', phoneNumber);
+    await setDoc(docRef, {
+      ...addressData,
+      lastUpdated: new Date().toISOString(),
+      phoneNumber: phoneNumber
+    }, { merge: true });
+    console.log('Address saved to Firebase successfully');
+    return true;
+  } catch (error) {
+    console.error('Error saving address to Firebase:', error);
+    return false;
+  }
+};
 
 const productDetails = {
   '41392567746606': { name: 'Kungiliyam Bath Soap', price: 80 },
@@ -543,17 +590,34 @@ const handleFlowResponse = async (flowResponse, phone) => {
     session.delivery_type = data.delivery_type || 'ship';
     session.discount_code = data.discount_code || '';
 
+    // Save address to Firebase
+    const addressData = {
+      name: session.name,
+      email: session.email,
+      mobile: session.mobile,
+      address: session.address.line,
+      city: session.address.city,
+      state: session.address.state,
+      pincode: session.address.pincode
+    };
+    
+    const saveResult = await saveAddressToFirebase(session.mobile, addressData);
+    
+    // Add this confirmation message after saving
+    if (saveResult) {
+      await sendMessage(phone, '💾 This address has been saved to the system. From your next order select "Use Existing" and use this address.');
+    }
+
     // Delivery type logic
     let shipping = 0;
     if (session.delivery_type === 'pickup') {
       shipping = 0;
-      // Do NOT overwrite address
     } else {
       shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
     }
     session.shipping = shipping;
 
-    // Discount code logic (same as Code 2)
+    // Discount code logic
     let discountAmount = 0;
     let discountMsg = '';
     if (session.discount_code) {
@@ -566,7 +630,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
         session.discount_value = 0;
         // Show retry/skip options
         const retryButtons = [
-          { type: 'reply', reply: { id: 'retry_discount', title: '🔄 Try Another Code' } },
+          { type: 'reply', reply: { id: 'retry_discount', title: '🔄 Try Another' } },
           { type: 'reply', reply: { id: 'skip_discount', title: '⏭️ Skip Discount' } }
         ];
         await sendInteractiveMessage(phone, '❌ Invalid Discount Code', 
@@ -590,7 +654,7 @@ const handleFlowResponse = async (flowResponse, phone) => {
         type: 'reply',
         reply: {
           id: 'confirm_payment',
-          title: '💳 Proceed to Payment'
+          title: '💳 Proceed Payment'
         }
       },
       {
@@ -792,6 +856,92 @@ app.post('/webhook', async (req, res) => {
           confirmButtonsSkip
         );
         break;
+      
+      case 'use_existing':
+        session.step = 'enter_phone_for_address';
+        await sendMessage(from, '📱 Please enter your 10-digit mobile number to fetch your saved address:');
+        sessions[from] = session;
+        break;
+
+      case 'enter_new':
+        // Send flow for new address entry
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cart_summary,
+            total_amount: session.total.toString(),
+            currency: 'INR'
+          };
+          
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+          session.step = 'checkout_flow';
+          sessions[from] = session;
+        } else {
+          // Fallback to traditional method
+          await sendMessage(from, session.cart_summary + '\n🧾 Please enter your *Name*');
+          session.step = 'name';
+          sessions[from] = session;
+        }
+        break;
+
+      case 'use_saved_addr':
+        session.step = 'delivery_method';
+        const deliveryButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'ship_to_addr',
+              title: '🚚 Ship to Address'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'pickup_store',
+              title: '🏪 Store Pickup'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '🚚 Delivery Method',
+          'Please choose your preferred delivery method:',
+          deliveryButtons
+        );
+        sessions[from] = session;
+        break;
+
+      case 'use_new_addr':
+        // Send flow for new address entry
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cart_summary,
+            total_amount: session.total.toString(),
+            currency: 'INR'
+          };
+          
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+          session.step = 'checkout_flow';
+          sessions[from] = session;
+        } else {
+          // Fallback to traditional method
+          await sendMessage(from, session.cart_summary + '\n🧾 Please enter your *Name*');
+          session.step = 'name';
+          sessions[from] = session;
+        }
+        break;
+
+      case 'ship_to_addr':
+        session.delivery_type = 'ship';
+        session.shipping = session.savedAddress.state && session.savedAddress.state.toLowerCase() === 'tn' ? 40 : 80;
+        await generateOrderSummary(from, session);
+        break;
+
+      case 'pickup_store':
+        session.delivery_type = 'pickup';
+        session.shipping = 0;
+        await generateOrderSummary(from, session);
+        break;
 
       case 'cancel_order':
         await sendMessage(from, '❌ Order cancelled. Type "Hi" to start over.');
@@ -832,24 +982,34 @@ app.post('/webhook', async (req, res) => {
     });
 
     session.total = total;
-    session.cart_summary = summary; // Store cart summary properly
-    session.step = 'checkout_flow';
+    session.cart_summary = summary;
+    session.step = 'address_selection';
     sessions[from] = session;
 
-    // Send flow for checkout if flow ID is configured
-    if (FLOW_IDS.CHECKOUT) {
-      const flowData = {
-        cart_summary: summary,
-        total_amount: total.toString(), // Convert to string
-        currency: 'INR'
-      };
-      
-      await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
-    } else {
-      // Fallback to traditional method
-      await sendMessage(from, summary + '\n🧾 Please enter your *Name*');
-      session.step = 'name';
-    }
+    // Send address selection buttons
+    const addressButtons = [
+      {
+        type: 'reply',
+        reply: {
+          id: 'use_existing',
+          title: '📍 Use Existing'
+        }
+      },
+      {
+        type: 'reply',
+        reply: {
+          id: 'enter_new',
+          title: '🆕 Enter New'
+        }
+      }
+    ];
+
+    await sendInteractiveMessage(
+      from,
+      '🛒 Cart Ready!',
+      `${summary}\n💰 Total: ₹${total}\n\nChoose your address option:`,
+      addressButtons
+    );
     
     return res.sendStatus(200);
   }
@@ -891,6 +1051,81 @@ app.post('/webhook', async (req, res) => {
     if (session.step === 'enter_discount_code') {
       session.discount_code = text.trim();
       await generateOrderSummary(from, session);
+      return res.sendStatus(200);
+    }
+
+    // Handle phone number input for address lookup
+    if (session.step === 'enter_phone_for_address') {
+      const phoneNumber = text.trim().replace(/\D/g, ''); // Remove non-digits
+      
+      if (phoneNumber.length !== 10) {
+        await sendMessage(from, '❌ Please enter a valid 10-digit mobile number:');
+        return res.sendStatus(200);
+      }
+
+      // Check Firebase for existing address
+      const savedAddress = await getAddressFromFirebase(phoneNumber);
+      
+      if (savedAddress) {
+        session.savedAddress = savedAddress;
+        session.name = savedAddress.name;
+        session.email = savedAddress.email;
+        session.mobile = savedAddress.mobile;
+        session.address = {
+          line: savedAddress.address,
+          city: savedAddress.city,
+          state: savedAddress.state,
+          pincode: savedAddress.pincode
+        };
+        
+        const addressText = `📍 Saved Address Found:\n\n👤 ${savedAddress.name}\n📧 ${savedAddress.email}\n📱 ${savedAddress.mobile}\n🏠 ${savedAddress.address}\n🏙️ ${savedAddress.city}, ${savedAddress.state} - ${savedAddress.pincode}`;
+        
+        const addressChoiceButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'use_saved_addr',
+              title: '✅ Use This'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'use_new_addr',
+              title: '🆕 Use New'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '📍 Address Found!',
+          addressText + '\n\nWould you like to use this address?',
+          addressChoiceButtons
+        );
+        
+        session.step = 'address_choice';
+      } else {
+        await sendMessage(from, '❌ No saved address found for this number.');
+        
+        // Send flow for new address entry
+        if (FLOW_IDS.CHECKOUT) {
+          const flowData = {
+            cart_summary: session.cart_summary,
+            total_amount: session.total.toString(),
+            currency: 'INR'
+          };
+          
+          await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+          session.step = 'checkout_flow';
+        } else {
+          // Fallback to traditional method
+          await sendMessage(from, session.cart_summary + '\n🧾 Please enter your *Name*');
+          session.step = 'name';
+        }
+      }
+      
+      sessions[from] = session;
       return res.sendStatus(200);
     }
 
