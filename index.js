@@ -893,9 +893,78 @@ app.post('/webhook', async (req, res) => {
         );
         break;
       
+      // case 'use_existing':
+      //   session.step = 'enter_phone_for_address';
+      //   await sendMessage(from, '📱 Please enter your 10-digit mobile number to fetch your saved address:');
+      //   sessions[from] = session;
+      //   break;
+
       case 'use_existing':
-        session.step = 'enter_phone_for_address';
-        await sendMessage(from, '📱 Please enter your 10-digit mobile number to fetch your saved address:');
+        // Use the WhatsApp number directly instead of asking for it
+        const phoneNumber = from.replace(/\D/g, ''); // Remove non-digits from WhatsApp number
+        
+        // Check Firebase for existing address using the WhatsApp number
+        const savedAddress = await getAddressFromFirebase(phoneNumber);
+        
+        if (savedAddress) {
+          session.savedAddress = savedAddress;
+          session.name = savedAddress.name;
+          session.email = savedAddress.email;
+          session.mobile = savedAddress.mobile;
+          session.address = {
+            line: savedAddress.address,
+            city: savedAddress.city,
+            state: savedAddress.state,
+            pincode: savedAddress.pincode
+          };
+          
+          const addressText = `📍 Saved Address Found:\n\n👤 ${savedAddress.name}\n📧 ${savedAddress.email}\n📱 ${savedAddress.mobile}\n🏠 ${savedAddress.address}\n🏙️ ${savedAddress.city}, ${savedAddress.state} - ${savedAddress.pincode}`;
+          
+          const addressChoiceButtons = [
+            {
+              type: 'reply',
+              reply: {
+                id: 'use_saved_addr',
+                title: '✅ Use This'
+              }
+            },
+            {
+              type: 'reply',
+              reply: {
+                id: 'use_new_addr',
+                title: '🆕 Use New'
+              }
+            }
+          ];
+
+          await sendInteractiveMessage(
+            from,
+            'Address Found!',
+            addressText + '\n\nWould you like to use this address?',
+            addressChoiceButtons
+          );
+          
+          session.step = 'address_choice';
+        } else {
+          await sendMessage(from, '❌ No saved address found for your number.');
+          
+          // Send flow for new address entry
+          if (FLOW_IDS.CHECKOUT) {
+            const flowData = {
+              cart_summary: session.cart_summary,
+              total_amount: session.total.toString(),
+              currency: 'INR'
+            };
+            
+            await sendFlowMessage(from, FLOW_IDS.CHECKOUT, flowData);
+            session.step = 'checkout_flow';
+          } else {
+            // Fallback to traditional method
+            await sendMessage(from, session.cart_summary + '\n🧾 Please enter your *Name*');
+            session.step = 'name';
+          }
+        }
+        
         sessions[from] = session;
         break;
 
