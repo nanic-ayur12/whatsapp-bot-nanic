@@ -106,13 +106,34 @@ app.use((req, res, next) => {
 // Logging middleware
 app.use((req, res, next) => {
   const isKeepAlive = req.get('X-Keep-Alive') === 'true';
+
   if (!isKeepAlive) {
-    console.log(`${req.method} ${req.path} - ${req.ip}`);
+    let phoneInfo = '';
+
+    // Check if this is a WhatsApp webhook POST
+    if (req.path === '/webhook' && req.method === 'POST' && req.body) {
+      const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+
+      if (msg && msg.from) {
+        // Clean the number: remove non-digits and trim to 10 digits if needed
+        let rawNumber = msg.from.replace(/\D/g, '');
+
+        if (rawNumber.startsWith('91') && rawNumber.length === 12) {
+          rawNumber = rawNumber.slice(2); // remove '91'
+        }
+
+        phoneInfo = ` from ${rawNumber}`;
+      }
+    }
+
+    console.log(`${req.method} ${req.path} - ${req.ip}${phoneInfo}`);
   } else {
     console.log(`Keep-alive request: ${req.method} ${req.path}`);
   }
+
   next();
 });
+
 
 // Razorpay instance
 const Razorpay = require("razorpay");
@@ -901,7 +922,12 @@ app.post('/webhook', async (req, res) => {
 
       case 'use_existing':
         // Use the WhatsApp number directly instead of asking for it
-        const phoneNumber = from.replace(/\D/g, ''); // Remove non-digits from WhatsApp number
+        let phoneNumber = from.replace(/\D/g, ''); // Remove all non-digit characters
+
+        // Remove '91' if it starts with it and length is 12
+        if (phoneNumber.startsWith('91') && phoneNumber.length === 12) {
+          phoneNumber = phoneNumber.slice(2);
+        }
         
         console.log(`Fetching saved address for phone number: ${phoneNumber}`);
         // Check Firebase for existing address using the WhatsApp number
