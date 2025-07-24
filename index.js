@@ -965,7 +965,7 @@ app.post('/webhook', async (req, res) => {
     }
 
     let total = 0;
-    let summary = '🛒 Cart Summary:\n';
+    let summary = 'Cart Summary:\n';
     session.cart = [];
 
     products.forEach(p => {
@@ -1099,7 +1099,7 @@ app.post('/webhook', async (req, res) => {
 
         await sendInteractiveMessage(
           from,
-          '📍 Address Found!',
+          'Address Found!',
           addressText + '\n\nWould you like to use this address?',
           addressChoiceButtons
         );
