@@ -825,6 +825,42 @@ app.post('/webhook', async (req, res) => {
         // }
         break;
 
+      case 'apply_discount':
+        session.step = 'enter_discount_saved';
+        await sendMessage(from, '🎟️ Please enter your discount code:');
+        sessions[from] = session;
+        break;
+
+      case 'skip_discount_saved':
+        session.discount_code = '';
+        session.discount_value = 0;
+        session.step = 'delivery_method_saved';
+        const deliveryButtons = [
+          {
+            type: 'reply',
+            reply: {
+              id: 'ship_to_addr',
+              title: '🚚 Ship to Address'
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'pickup_store',
+              title: '🏪 Store Pickup'
+            }
+          }
+        ];
+
+        await sendInteractiveMessage(
+          from,
+          '🚚 Delivery Method',
+          'Please choose your preferred delivery method:',
+          deliveryButtons
+        );
+        sessions[from] = session;
+        break;
+
       case 'skip_discount':
         // Skip discount and proceed to payment
         session.discount_code = '';
@@ -884,29 +920,29 @@ app.post('/webhook', async (req, res) => {
         break;
 
       case 'use_saved_addr':
-        session.step = 'delivery_method';
-        const deliveryButtons = [
+        session.step = 'discount_offer';
+        const discountButtons = [
           {
             type: 'reply',
             reply: {
-              id: 'ship_to_addr',
-              title: '🚚 Ship to Address'
+              id: 'apply_discount',
+              title: '🎟️ Apply Discount'
             }
           },
           {
             type: 'reply',
             reply: {
-              id: 'pickup_store',
-              title: '🏪 Store Pickup'
+              id: 'skip_discount_saved',
+              title: '⏭️ Skip Discount'
             }
           }
         ];
 
         await sendInteractiveMessage(
           from,
-          '🚚 Delivery Method',
-          'Please choose your preferred delivery method:',
-          deliveryButtons
+          '🎟️ Discount Code',
+          'Would you like to apply a discount code to your order?',
+          discountButtons
         );
         sessions[from] = session;
         break;
@@ -1280,6 +1316,73 @@ app.post('/webhook', async (req, res) => {
 
       case 'discount_retry':
         // This case is handled by button responses above
+        break;
+
+      case 'enter_discount_saved':
+        const userDiscountCode = text.trim();
+        if (userDiscountCode) {
+          const discountRes = await validateDiscountCode(userDiscountCode, session.total);
+          if (discountRes.valid) {
+            session.discount_code = userDiscountCode;
+            session.discount_value = discountRes.amount;
+            
+            await sendMessage(from, `✅ Discount code "${userDiscountCode}" applied successfully! You'll save ₹${discountRes.amount}`);
+            
+            session.step = 'delivery_method_saved';
+            const deliveryButtons = [
+              {
+                type: 'reply',
+                reply: {
+                  id: 'ship_to_addr',
+                  title: '🚚 Ship to Address'
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: 'pickup_store',
+                  title: '🏪 Store Pickup'
+                }
+              }
+            ];
+            await sendInteractiveMessage(
+              from,
+              '🚚 Delivery Method',
+              'Please choose your preferred delivery method:',
+              deliveryButtons
+            );
+          } else {
+            const retryButtons = [
+              {
+                type: 'reply',
+                reply: {
+                  id: 'apply_discount',
+                  title: '🔄 Try Another'
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: 'skip_discount_saved',
+                  title: '⏭️ Skip Discount'
+                }
+              }
+            ];
+            await sendInteractiveMessage(
+              from,
+              '❌ Invalid Discount Code',
+              `Sorry, the discount code "${userDiscountCode}" is invalid or expired.\n\nWould you like to try another code?`,
+              retryButtons
+            );
+            session.step = 'discount_retry_saved';
+          }
+        } else {
+          await sendMessage(from, '❓ Please enter a valid discount code:');
+        }
+        sessions[from] = session;
+        break;
+      case 'discount_retry_saved':
+        // This will be handled by the button responses above
         break;
 
       case 'shopify':
