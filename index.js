@@ -903,6 +903,7 @@ app.post('/webhook', async (req, res) => {
         // Use the WhatsApp number directly instead of asking for it
         const phoneNumber = from.replace(/\D/g, ''); // Remove non-digits from WhatsApp number
         
+        console.log(`Fetching saved address for phone number: ${phoneNumber}`);
         // Check Firebase for existing address using the WhatsApp number
         const savedAddress = await getAddressFromFirebase(phoneNumber);
         
