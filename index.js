@@ -530,29 +530,17 @@ const handleFlowResponse = async (flowResponse, phone) => {
     const data = JSON.parse(response_json);
     const session = sessions[phone] || {};
 
-    // Update session with flow data
-    session.name = data.name;
-    session.email = data.email;
-    session.mobile = data.mobile;
-    session.address = {
-      line: data.address,
-      city: data.city,
-      state: data.state,
-      pincode: data.pincode
-    };
-    session.delivery_type = data.delivery_type || 'ship';
-    session.discount_code = data.discount_code || '';
-
-    // Delivery type logic
-    let shipping = 0;
-    if (session.delivery_type === 'pickup') {
-      shipping = 0;
-      // Do NOT overwrite address
-    } else {
-      shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-    }
-    session.shipping = shipping;
-
+    // Check if this is an address form response
+    if (session.step === 'awaiting_address_flow') {
+      // Update session with flow data
+      session.name = data.name;
+      session.email = data.email;
+      session.mobile = data.mobile;
+      session.address = {
+        line: data.address,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode
     // Discount code logic (same as Code 2)
     let discountAmount = 0;
     let discountMsg = '';
@@ -992,27 +980,52 @@ app.post('/webhook', async (req, res) => {
   const proceedWithOrderSummary = async (phone, session) => {
     // Calculate shipping
     let shipping = 0;
-    if (session.delivery_type === 'ship') {
-      shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
-    }
-    session.shipping = shipping;
-
-    // Calculate discount if any
-    let discountAmount = 0;
-    let discountMsg = '';
-    if (session.discount_code) {
-      const discountRes = await validateDiscountCode(session.discount_code, session.total);
-      if (discountRes.valid) {
-        discountAmount = discountRes.amount;
-        session.discount_value = discountAmount;
-        discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
-      } else {
-        session.discount_value = 0;
-        discountMsg = `\n❌ Discount code invalid or expired.`;
-      }
+      
+      // Save address to Firebase
+      const addressData = {
+        name: session.name,
+        email: session.email,
+        mobile: session.mobile,
+        address: session.address.line,
+        city: session.address.city,
+        state: session.address.state,
+        pincode: session.address.pincode
+      };
+      
+      await saveAddressToFirebase(session.mobile, addressData);
+      
+      // Proceed with delivery options
+      await proceedWithDeliveryOptions(phone, session);
+      
     } else {
-      session.discount_value = 0;
-    }
+      // Handle checkout flow response (original logic)
+      session.name = data.name;
+      session.email = data.email;
+      session.mobile = data.mobile;
+      session.address = {
+        line: data.address,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode
+      };
+      session.delivery_type = data.delivery_type || 'ship';
+      session.discount_code = data.discount_code || '';
+
+      // Delivery type logic
+      let shipping = 0;
+      if (session.delivery_type === 'pickup') {
+        shipping = 0;
+        session.address = {
+          line: 'No: 18, Mani Nagar, Sivanandapuram, Saravanampatti',
+          city: 'Coimbatore',
+          state: 'TN',
+          pincode: '641035',
+          country: 'India'
+        };
+      } else {
+        shipping = session.address.state && session.address.state.toLowerCase() === 'tn' ? 40 : 80;
+      }
+      session.shipping = shipping;
 
     session.totalWithShipping = session.total + shipping - discountAmount;
     if (session.totalWithShipping < 0) session.totalWithShipping = 0;
@@ -1041,9 +1054,22 @@ app.post('/webhook', async (req, res) => {
       '✅ Order Summary',
       `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\n📍 ${deliveryText}`,
       confirmButtons
-    );
-
-    sessions[phone] = session;
+      // Discount code logic
+      let discountAmount = 0;
+      let discountMsg = '';
+      if (session.discount_code) {
+        const discountRes = await validateDiscountCode(session.discount_code, session.total);
+        if (discountRes.valid) {
+          discountAmount = discountRes.amount;
+          session.discount_value = discountAmount;
+          discountMsg = `\n🎟️ Discount Applied: -₹${discountAmount} (${session.discount_code})`;
+        } else {
+          session.discount_value = 0;
+          discountMsg = `\n❌ Discount code invalid or expired.`;
+        }
+      } else {
+        session.discount_value = 0;
+      }
   };
 
   if (type === 'text') {
@@ -1521,30 +1547,36 @@ app.get('/payment-success', (req, res) => {
   updateActivity();
   
   // Redirect to the main webhook route
-  res.redirect('/razorpay-webhook' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''));
-});
+      session.totalWithShipping = session.total + shipping - discountAmount;
+      if (session.totalWithShipping < 0) session.totalWithShipping = 0;
+      
+      // Send confirmation with payment
+      const confirmButtons = [
+        {
+          type: 'reply',
+          reply: {
+            id: 'confirm_payment',
+            title: '💳 Proceed to Payment'
+          }
+        },
+        {
+          type: 'reply',
+          reply: {
+            id: 'cancel_order',
+            title: '❌ Cancel Order'
+          }
+        }
+      ];
 
-// Test route to verify webhook page is working
-app.get('/test-payment-success', (req, res) => {
-  console.log('GET /test-payment-success accessed');
-  updateActivity();
-  
-  // Redirect to the main webhook route for testing
-  res.redirect('/razorpay-webhook');
-});
-
-// Razorpay Webhook POST handler
-app.post('/razorpay-webhook', express.json(), async (req, res) => {
-  updateActivity();
-  
-  const event = req.body;
-
-  if (event.event === 'payment_link.paid') {
-    const linkId = event.payload.payment_link.entity.id;
-
-    const phone = Object.keys(sessions).find(
-      key => sessions[key]?.paymentLinkId === linkId
-    );
+      await sendInteractiveMessage(
+        phone,
+        '✅ Order Summary',
+        `Thank you ${session.name}!\n\n📦 Items Total: ₹${session.total}${discountMsg}\n🚚 Shipping: ₹${shipping}\n💰 *Grand Total: ₹${session.totalWithShipping}*\n\nShipping to:\n${session.address.line}, ${session.address.city}, ${session.address.state} - ${session.address.pincode}`,
+        confirmButtons
+      );
+    }
+    
+    sessions[phone] = session;
 
     if (!phone) return res.sendStatus(404);
     const session = sessions[phone];
